@@ -66,7 +66,7 @@ bool lshd_reached = false;
 bool lshd_hlt = false;
 bool lshd_reset = false;
 bool input_end = false;
-double llwa_pos_target = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double lshd_default = 0.00;
 
 /* ********************************************************************************************* */
@@ -108,7 +108,7 @@ void init() {
 	somatic_d_channel_open(&daemon_cx, &waistCmdChan, "waistd-cmd", NULL);
 
 	// Initialize IMU Data
-	initIMU(&daemon_cx, &imuChan);
+	initIMU(daemon_cx, &imuChan);
 
 	// Initialize the joystick channel
 	int r = ach_open(&js_chan, "joystick-data", NULL);
@@ -123,10 +123,12 @@ void init() {
 
 void init_pos_targ() {
 	somatic_motor_update(&daemon_cx, &llaw);
-	llwa_pos_target = llaw.pos();
+	for (int i = 0; i < 7; ++i) {
+		llwa_pos_target[i] = llaw.pos[i];
+	}
 }
 
-void haltMovements () {
+void haltMovement () {
 	somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
 	somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
 	somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
