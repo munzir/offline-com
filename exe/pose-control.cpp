@@ -178,9 +178,16 @@ void init_pos_targ() {
 /* ********************************************************************************************* */
 /// stop all movements
 void haltMovement () {
-	somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
-	somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
+	// Halt Arm
+	haltArm(daemon_cx, llwa);
+	haltArm(daemon_cx, rlwa);
+
+	// Halt Torso
+	double dq [] = {0.0};
+	somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, NULL, 1, NULL);
 	somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
+
+	// Halt Waist
 	static Somatic__WaistCmd *waistDaemonCmd = somatic_waist_cmd_alloc();
 	somatic_waist_cmd_set(waistDaemonCmd, SOMATIC__WAIST_MODE__STOP);
 	somatic_metadata_set_time_now(waistDaemonCmd->meta);
@@ -190,7 +197,7 @@ void haltMovement () {
 
 /* ********************************************************************************************* */
 /// update waist state value
-double updateWaistState(){
+double getWaistState(){
 	struct timespec currTime;
 	clock_gettime(CLOCK_MONOTONIC, &currTime);
 	struct timespec abstime = aa_tm_add(aa_tm_sec2timespec(1.0/30.0), currTime);
@@ -200,6 +207,30 @@ double updateWaistState(){
 	double waist_val = (waist->position->data[0] - waist->position->data[1]) / 2.0;
 	return waist_val;
 }
+
+/* ********************************************************************************************* */
+/// update waist state value
+double getIMUState(){
+	struct timespec currTime;
+	clock_gettime(CLOCK_MONOTONIC, &currTime);
+	struct timespec abstime = aa_tm_add(aa_tm_sec2timespec(1.0/30.0), currTime);
+	int r;
+	double imu, imuSpeed;
+	Somatic__Vector *imu_msg = SOMATIC_WAIT_LAST_UNPACK(r, somatic__vector,
+														&protobuf_c_system_allocator, IMU_CHANNEL_SIZE, &imuChan, &abstime );
+	assert((imu_msg != NULL) && "Imu message is faulty!");
+
+	// Get the imu position and velocity value from the readings (note imu mounted at 45 deg).
+	static const double mountAngle = -.7853981634;
+	double newX = imu_msg->data[0] * cos(mountAngle) - imu_msg->data[1] * sin(mountAngle);
+	double _imu = atan2(newX, imu_msg->data[2]);
+
+	// Free the unpacked message
+	somatic__vector__free_unpacked( imu_msg, &protobuf_c_system_allocator );
+
+	return _imu;
+}
+
 
 /* ********************************************************************************************* */
 /// record data for offline COM analysis
@@ -222,8 +253,11 @@ void recordData() {
 	somatic_motor_update(&daemon_cx, &torso);
 	cout << "torso pose: " << torso.pos[0] << endl;
 
-	double w_val = updateWaistState();
+	double w_val = getWaistState();
 	cout << "waist pose: " << w_val << endl;
+
+	double imu_val = getIMUState();
+	cout << "imu pose: " << imu_val << endl;
 }
 
 /* ********************************************************************************************* */
@@ -267,7 +301,7 @@ void controlWaist() {
 	if(ACH_OK != r) fprintf(stderr, "Couldn't send message: %s\n",
 							ach_result_to_string(static_cast<ach_status_t>(r)));
 
-	double w_val = updateWaistState();
+	double w_val = getWaistState();
 	if ((x[5] < -0.9) || (x[5] > 0.9)) {
 		cout << "waist pose: " << w_val << endl;
 	}
@@ -350,9 +384,87 @@ void controlShoulders() {
 	}
 }
 
+void updateArmTarget(double targetPose[], double configPose[]) {
+	// we are ignoring shoulder motor (idx = 0)
+	for (int i = 1; i < 7; ++i) {
+		targetPose[i] = configPose[i];
+	}
+}
+
 /* ********************************************************************************************* */
 /// Handles arm configurations
 void controlArms() {
+	// button 3 for reset to deafult position
+	if ((b[6] == 1) && (b[2] == 1)) {
+		if(!pose_mv && input_end) {
+			// if not moving currently, update reset and move flags
+			llwa_reset = true;
+			pose_mv = true;
+
+			// update target
+			updateArmTarget(llwa_pos_target, llwa_pos_default);
+
+			// if we reached the previous destination, reset reached flag
+			if (llwa_reached) {
+				llwa_reached = false;
+			}
+		}
+		return;
+	}
+
+	// buttons 1 and 2 are for forward/backward position toggles
+	if (((b[6]==1) && (b[0] == 1)) || ((b[6]==1) && (b[1] == 1))) {
+		if (!pose_mv && input_end) {
+			// if not moving currently, update reset and move flags
+			llwa_reset = true;
+			pose_mv = true;
+
+			if (lshd_reached) {
+				// if reached previous location, decrease/increase target by step
+				int step = (b[0] == 1) ? 1 : -1;
+				llwa_config_idx = (llwa_config_idx + 1) % sizeof(presetArmConfsL);
+				updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
+				lshd_reached = false;
+			}
+		}
+		return;
+	}
+
+	// button 3 for reset to deafult position
+	if ((b[7] == 1) && (b[2] == 1)) {
+		if(!pose_mv && input_end) {
+			// if not moving currently, update reset and move flags
+			rlwa_reset = true;
+			pose_mv = true;
+
+			// update target
+			updateArmTarget(rlwa_pos_target, rlwa_pos_default);
+
+			// if we reached the previous destination, reset reached flag
+			if (rlwa_reached) {
+				rlwa_reached = false;
+			}
+		}
+		return;
+	}
+
+	// buttons 1 and 2 are for forward/backward position toggles
+	if (((b[7]==1) && (b[0] == 1)) || ((b[6]==1) && (b[1] == 1))) {
+		if (!pose_mv && input_end) {
+			// if not moving currently, update reset and move flags
+			rlwa_reset = true;
+			pose_mv = true;
+
+			if (rlwa_reached) {
+				// if reached previous location, decrease/increase target by step
+				int step = (b[0] == 1) ? 1 : -1;
+				rlwa_config_idx = (rlwa_config_idx + 1) % sizeof(presetArmConfsR);
+				updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
+				rlwa_reached = false;
+			}
+		}
+		return;
+	}
 
 }
 
