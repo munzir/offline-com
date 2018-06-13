@@ -225,7 +225,6 @@ void run() {
 		// Read the joystick data
 		readJoystick();
 
-
 		processJS();
 
 		applyMove();

@@ -64,7 +64,7 @@ char b[10];
 double x[6];
 
 bool hlt = false;
-bool input_end = false;
+bool input_end = true;
 
 bool pose_mv = false;
 
@@ -85,6 +85,9 @@ double torso_pos_target = 0.0;
 double llwa_pos_default[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double rlwa_pos_default[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double torso_pos_default = -5.26;
+
+int llwa_config_idx = 0;
+int rlwa_config_idx = 0;
 
 // The preset arm configurations: forward, thriller, more forward for balancing, zero
 double presetArmConfsL [][7] = {
@@ -226,14 +229,26 @@ void recordData() {
 /* ********************************************************************************************* */
 /// check if one of the numerical buttons is being pressed
 bool buttonPressed() {
-	bool pressed = false;
-	for (int i =0; i < 10; ++i) {
-		if (b[i] == 1) {
-			pressed = true;
-			return pressed;
-		}
+    // if we are logging
+	if (b[3] == 1) {
+		return true;
 	}
-	return pressed;
+	// arm and shoulder configs
+	if (((b[4] == 1) || (b[5] == 1) || (b[6] == 1) || (b[7] == 1)) && ((b[0] == 1) || (b[1] == 1) || (b[2] == 1))) {
+		return true;
+	}
+
+	// torso commands
+	if (((x[3] > 0.9) || (x[3] < -0.9)) && ((b[0] == 1) || (b[1] == 1) || (b[2] == 1))) {
+		return true;
+	}
+
+	// valid waist command
+	if ((x[5] < -0.9) || (x[5] > 0.9)) {
+		return true;
+	}
+
+	return false;
 }
 
 /* ********************************************************************************************* */
@@ -253,18 +268,19 @@ void controlWaist() {
 							ach_result_to_string(static_cast<ach_status_t>(r)));
 
 	double w_val = updateWaistState();
-	cout << "waist pose: " << w_val << endl;
+	if ((x[5] < -0.9) || (x[5] > 0.9)) {
+		cout << "waist pose: " << w_val << endl;
+	}
 }
 
 /* ********************************************************************************************* */
 /// Handles shoulders
 void controlShoulders() {
 
-	double shoulder_stepsize;
+	double shoulder_stepsize = 0.1;
 
 	// button 3 for reset to deafult position
 	if ((b[4] == 1) && (b[2] == 1)) {
-		input_end = false;
 		if(!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			llwa_reset = true;
@@ -275,7 +291,7 @@ void controlShoulders() {
 
 			// if we reached the previous destination, reset reached flag
 			if (lshd_reached) {
-				lsdh_reached = false;
+				lshd_reached = false;
 			}
 		}
 		return;
@@ -283,7 +299,6 @@ void controlShoulders() {
 
 	// buttons 1 and 2 are for forward/backward position toggles
 	if (((b[4]==1) && (b[0] == 1)) || ((b[4]==1) && (b[1] == 1))) {
-		input_end = false;
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			llwa_reset = true;
@@ -292,8 +307,8 @@ void controlShoulders() {
 			if (lshd_reached) {
 				// if reached previous location, decrease/increase target by step
 				double step = (b[0] == 1) ? shoulder_stepsize: -shoulder_stepsize;
-				llwa_pos_target[0] += step_size;
-				lsdh_reached = false;
+				llwa_pos_target[0] += step;
+				lshd_reached = false;
 			}
 		}
 		return;
@@ -301,7 +316,6 @@ void controlShoulders() {
 
 	// button 3 for reset to deafult position
 	if ((b[5] == 1) && (b[2] == 1)) {
-		input_end = false;
 		if(!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			rlwa_reset = true;
@@ -312,7 +326,7 @@ void controlShoulders() {
 
 			// if we reached the previous destination, reset reached flag
 			if (rshd_reached) {
-				rsdh_reached = false;
+				rshd_reached = false;
 			}
 		}
 		return;
@@ -320,7 +334,6 @@ void controlShoulders() {
 
 	// buttons 1 and 2 are for forward/backward position toggles
 	if (((b[5]==1) && (b[0] == 1)) || ((b[5]==1) && (b[1] == 1))) {
-		input_end = false;
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			rlwa_reset = true;
@@ -329,8 +342,8 @@ void controlShoulders() {
 			if (rshd_reached) {
 				// if reached previous location, decrease/increase target by step
 				double step = (b[0] == 1) ? shoulder_stepsize : -shoulder_stepsize;
-				rlwa_pos_target[0] += step_size;
-				rsdh_reached = false;
+				rlwa_pos_target[0] += step;
+				rshd_reached = false;
 			}
 		}
 		return;
@@ -351,7 +364,6 @@ void controlTorso() {
 
 	// button 3 for reset to deafult position
 	if ((x[3] > 0.9) && (b[2] == 1)) {
-		input_end = false;
 		if(!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			torso_reset = true;
@@ -370,7 +382,6 @@ void controlTorso() {
 
 	// buttons 1 and 2 are for forward/backward position toggles
 	if (((x[3] > 0.9) && (b[0] == 1)) || ((x[3] > 0.9) && (b[1] == 1))) {
-		input_end = false;
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			torso_reset = true;
@@ -379,7 +390,7 @@ void controlTorso() {
 			if (torso_reached) {
 				// if reached previous location, decrease/increase target by step
 				double step = (b[0] == 1) ? torso_stepsize : -torso_stepsize;
-				torso_pos_target[0] += step_size;
+				torso_pos_target += step;
 				torso_reached = false;
 			}
 		}
@@ -406,14 +417,14 @@ void processJS() {
 	}
 
 	// if no buttons are actively pressed we halt all movements
-	if (!buttonPressed()) {
+	if (buttonPressed()) {
 		input_end = false;
+	} else {
+		input_end = true;
 		pose_mv = false;
 		hlt = true;
-		return;
 	}
 
-	input_end = true;
 }
 
 /* ********************************************************************************************* */
@@ -435,9 +446,10 @@ void applyMove() {
 	}
 
 	if (pose_mv) {
+		double torso_pos_array[1] = {torso_pos_target};
 		somatic_motor_cmd(&daemon_cx, &llwa, POSITION, llwa_pos_target, 7, NULL);
 		somatic_motor_cmd(&daemon_cx, &rlwa, POSITION, rlwa_pos_target, 7, NULL);
-		somatic_motor_cmd(&daemon_cx, &torso, POSITION, torso_pos_target, 1, NULL);
+		somatic_motor_cmd(&daemon_cx, &torso, POSITION, torso_pos_array, 1, NULL);
 	}
 }
 
@@ -471,8 +483,8 @@ void poseUpdate() {
 	}
 
 	// check arm configuration
-    llwa_reached = (llwa_pos, llwa_pos_target, delta);
-	rlwa_reached = (rlwa_pos, rlwa_pos_target, delta);
+    llwa_reached = checkArm(llwa.pos, llwa_pos_target, delta);
+	rlwa_reached = checkArm(rlwa.pos, rlwa_pos_target, delta);
 
 	// half if arms positions reached
 	if (lshd_reached && llwa_reached) {
