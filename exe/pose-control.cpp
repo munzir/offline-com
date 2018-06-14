@@ -36,6 +36,9 @@
 #include "initModules.h"
 #include "motion.h"
 #include <iostream>
+#include <iostream>
+#include <fstream>
+#include <vector>
 
 using namespace std;
 
@@ -74,6 +77,13 @@ bool llwa_reached = true;
 bool rlwa_reached = true;
 bool torso_reached = true;
 
+// 0 for initial value, 1 for clockwise, 2 for counter clockwise
+bool lshd_dir = 0;
+bool rshd_dir = 0;
+bool llwa_dir = 0;
+bool rlwa_dir = 0;
+bool torso_dir = 0;
+
 bool llwa_reset = false;
 bool rlwa_reset = false;
 bool torso_reset = false;
@@ -90,18 +100,44 @@ int llwa_config_idx = 0;
 int rlwa_config_idx = 0;
 
 // The preset arm configurations: forward, thriller, more forward for balancing, zero
-double presetArmConfsL [][7] = {
-		{  1.102, -0.589,  0.000, -1.339,  0.000, -1.400,  0.000},
-		{  1.008,  -1.113,  -0.000,  -1.594,   0.037,   1.022,  -0.021}, // sitting grasp ready (left)
-		{  1.400, -1.000,  0.000, -0.800,  0.000, -0.800,  0.000},
-		{  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000},
-};
-double presetArmConfsR [][7] = {
-		{ -1.102,  0.589,  0.000,  1.339,  0.000,  1.400,  0.000},
-		{  -0.855,   1.113,   0.000,   1.561,  -0.028,  -1.052,   0.021}, // sitting grasp ready (right)
-		{ -1.400,  1.000,  0.000,  0.800,  0.000,  0.800,  0.000},
-		{  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000},
-};
+//double presetArmConfsL [][7] = {
+//		{  1.102, -0.589,  0.000, -1.339,  0.000, -1.400,  0.000},
+//		{  1.008,  -1.113,  -0.000,  -1.594,   0.037,   1.022,  -0.021}, // sitting grasp ready (left)
+//		{  1.400, -1.000,  0.000, -0.800,  0.000, -0.800,  0.000},
+//		{  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000},
+//};
+
+//double presetArmConfsR [][7] = {
+//		{ -1.102,  0.589,  0.000,  1.339,  0.000,  1.400,  0.000},
+//		{  -0.855,   1.113,   0.000,   1.561,  -0.028,  -1.052,   0.021}, // sitting grasp ready (right)
+//		{ -1.400,  1.000,  0.000,  0.800,  0.000,  0.800,  0.000},
+//		{  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000},
+//};
+
+vector<double[7]> presetArmConfsL;
+vector<double[7]> presetArmConfsR;
+
+/* ********************************************************************************************* */
+/// Read and write poses to file
+void readPoseFile() {
+	ifstream in_file("poses.txt");
+	count = 0;
+	while(getline(in,line)){
+		stringstream lineStream(line);
+		string num;
+		double pose[7];
+		int i = 0;
+		while(getline(lineStream, num, ',')) {
+			istringstream convert(num);
+			convert >> pose[i];
+			++i;
+		}
+		((count % 2) == 0) ? presetArmConfsL.push_back(pose) : presetArmConfsR.push_back(pose);
+	}
+	in_file.close();
+}
+
+ofstream out_file("data.txt");
 
 /* ********************************************************************************************* */
 /// Reads the joystick data into global variables 'b' and 'x', b for button press and x for axes data
@@ -241,23 +277,28 @@ void recordData() {
 	cout << "left arm poses: ";
 	for (int i = 0; i < 7; ++i) {
 		cout << llwa.pos[i] << ", ";
+		out_file << llwa.pos[i] << ", ";
 	}
 	cout << endl;
 
 	cout << "right arm poses: ";
 	for (int i = 0; i < 7; ++i) {
 		cout << rlwa.pos[i] << ", ";
+		out_file << rlwa.pos[i] << ", ";
 	}
 	cout << endl;
 
 	somatic_motor_update(&daemon_cx, &torso);
 	cout << "torso pose: " << torso.pos[0] << endl;
+	out_file << torso.pos[0] << ", ";
 
 	double w_val = getWaistState();
 	cout << "waist pose: " << w_val << endl;
+	out_file << w_val << ", ";
 
 	double imu_val = getIMUState();
 	cout << "imu pose: " << imu_val << endl;
+	out_file << imu_val << endl;
 }
 
 /* ********************************************************************************************* */
@@ -267,13 +308,14 @@ bool buttonPressed() {
 	if (b[3] == 1) {
 		return true;
 	}
+
 	// arm and shoulder configs
 	if (((b[4] == 1) || (b[5] == 1) || (b[6] == 1) || (b[7] == 1)) && ((b[0] == 1) || (b[1] == 1) || (b[2] == 1))) {
 		return true;
 	}
 
 	// torso commands
-	if (((x[3] > 0.9) || (x[3] < -0.9)) && ((b[0] == 1) || (b[1] == 1) || (b[2] == 1))) {
+	if ((x[3] > 0.9) && ((b[0] == 1) || (b[1] == 1) || (b[2] == 1))) {
 		return true;
 	}
 
@@ -302,9 +344,7 @@ void controlWaist() {
 							ach_result_to_string(static_cast<ach_status_t>(r)));
 
 	double w_val = getWaistState();
-	if ((x[5] < -0.9) || (x[5] > 0.9)) {
-		cout << "waist pose: " << w_val << endl;
-	}
+	if ((x[5] < -0.9) || (x[5] > 0.9)) { cout << "waist pose: " << w_val << endl; }
 }
 
 /* ********************************************************************************************* */
@@ -325,23 +365,24 @@ void controlShoulders() {
 
 			// if we reached the previous destination, reset reached flag
 			if (lshd_reached) {
+				lsdh_dir = 0;
 				lshd_reached = false;
 			}
 		}
 		return;
 	}
 
-	// buttons 1 and 2 are for forward/backward position toggles
+	// buttons 1 and 2 are for clockwise/counterclockwise position change
 	if (((b[4]==1) && (b[0] == 1)) || ((b[4]==1) && (b[1] == 1))) {
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			llwa_reset = true;
 			pose_mv = true;
 
-			if (lshd_reached) {
-				// if reached previous location, decrease/increase target by step
-				double step = (b[0] == 1) ? shoulder_stepsize: -shoulder_stepsize;
-				llwa_pos_target[0] += step;
+			// we only update our target if we have reach our previous target or the direction is difference
+			if (lshd_reached || (((b[0] == 1) && (lshd_dir == -1)) || ((b[1] == 1) && (lshd_dir == 1)))) {
+				lshd_dir = (b[0] == 1) ? 1 : -1;
+				llwa_pos_target[0] += shoulder_stepsize * lshd_dir;
 				lshd_reached = false;
 			}
 		}
@@ -360,23 +401,24 @@ void controlShoulders() {
 
 			// if we reached the previous destination, reset reached flag
 			if (rshd_reached) {
+			    rsdh_dir = 0;
 				rshd_reached = false;
 			}
 		}
 		return;
 	}
 
-	// buttons 1 and 2 are for forward/backward position toggles
+	// buttons 1 and 2 are for clockwise/counterclockwise position change
 	if (((b[5]==1) && (b[0] == 1)) || ((b[5]==1) && (b[1] == 1))) {
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			rlwa_reset = true;
 			pose_mv = true;
 
-			if (rshd_reached) {
-				// if reached previous location, decrease/increase target by step
-				double step = (b[0] == 1) ? shoulder_stepsize : -shoulder_stepsize;
-				rlwa_pos_target[0] += step;
+			// we only update our target if we have reach our previous target or the direction is difference
+			if (rshd_reached || (((b[0] == 1) && (rshd_dir == -1)) || ((b[1] == 1) && (rshd_dir == 1)))) {
+				rshd_dir = (b[0] == 1) ? 1 : -1;
+				rlwa_pos_target[0] += shoulder_stepsize * rshd_dir;
 				rshd_reached = false;
 			}
 		}
@@ -400,29 +442,28 @@ void controlArms() {
 			// if not moving currently, update reset and move flags
 			llwa_reset = true;
 			pose_mv = true;
-
 			// update target
 			updateArmTarget(llwa_pos_target, llwa_pos_default);
-
 			// if we reached the previous destination, reset reached flag
 			if (llwa_reached) {
 				llwa_reached = false;
+				llwa_dir = 0;
 			}
 		}
 		return;
 	}
 
-	// buttons 1 and 2 are for forward/backward position toggles
+	// buttons 1 and 2 are for clockwise/counterclockwise position change
 	if (((b[6]==1) && (b[0] == 1)) || ((b[6]==1) && (b[1] == 1))) {
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			llwa_reset = true;
 			pose_mv = true;
-
-			if (lshd_reached) {
+			// we only update our target if we have reach our previous target or the direction is difference
+			if (llwa_reached || (((b[0] == 1) && (llwa_dir == -1)) || ((b[1] == 1) && (llwa_dir == 1)))) {
 				// if reached previous location, decrease/increase target by step
-				int step = (b[0] == 1) ? 1 : -1;
-				llwa_config_idx = (llwa_config_idx + 1) % sizeof(presetArmConfsL);
+				llwa_dir = (b[0] == 1) ? 1 : -1;
+				llwa_config_idx = (llwa_config_idx + llwa_dir) % sizeof(presetArmConfsL);
 				updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
 				lshd_reached = false;
 			}
@@ -436,36 +477,34 @@ void controlArms() {
 			// if not moving currently, update reset and move flags
 			rlwa_reset = true;
 			pose_mv = true;
-
 			// update target
 			updateArmTarget(rlwa_pos_target, rlwa_pos_default);
-
 			// if we reached the previous destination, reset reached flag
 			if (rlwa_reached) {
 				rlwa_reached = false;
+				rlwa_dir = 0;
 			}
 		}
 		return;
 	}
 
-	// buttons 1 and 2 are for forward/backward position toggles
+	// buttons 1 and 2 are for clockwise/counterclockwise position change
 	if (((b[7]==1) && (b[0] == 1)) || ((b[6]==1) && (b[1] == 1))) {
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			rlwa_reset = true;
 			pose_mv = true;
 
-			if (rlwa_reached) {
+			if (rlwa_reached || (((b[0] == 1) && (rlwa_dir == -1)) || ((b[1] == 1) && (rlwa_dir == 1)))) {
 				// if reached previous location, decrease/increase target by step
-				int step = (b[0] == 1) ? 1 : -1;
-				rlwa_config_idx = (rlwa_config_idx + 1) % sizeof(presetArmConfsR);
+				rlwa_dir = (b[0] == 1) ? 1 : -1;
+				rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % sizeof(presetArmConfsR);
 				updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
 				rlwa_reached = false;
 			}
 		}
 		return;
 	}
-
 }
 
 /* ********************************************************************************************* */
@@ -487,22 +526,24 @@ void controlTorso() {
 			// if we reached the previous destination, reset reached flag
 			if (torso_reached) {
 				torso_reached = false;
+				torso_dir = 0;
 			}
 		}
 		return;
 	}
 
 	// buttons 1 and 2 are for forward/backward position toggles
-	if (((x[3] > 0.9) && (b[0] == 1)) || ((x[3] > 0.9) && (b[1] == 1))) {
+	if (((x[3] > 0.9) && (b[0] == 1))  ((x[3] > 0.9) && (b[1] == 1))) {
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			torso_reset = true;
 			pose_mv = true;
 
-			if (torso_reached) {
+			if (torso_reached || (((x[3] > 0.9) && (torso_dir == -1)) || ((x[3] > 0.9) && (torso_dir == 1)))) {
 				// if reached previous location, decrease/increase target by step
-				double step = (b[0] == 1) ? torso_stepsize : -torso_stepsize;
-				torso_pos_target += step;
+				torso_dir = (b[0] == 1) ? 1 : -1;
+				updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
+				torso_pos_target += torso_stepsize * torso_dir;
 				torso_reached = false;
 			}
 		}
@@ -524,9 +565,7 @@ void processJS() {
     controlTorso();
 
 	// When button 4 is pressed we record our pose
-	if (b[3] == 1) {
-		recordData();
-	}
+	if (b[3] == 1) recordData();
 
 	// if no buttons are actively pressed we halt all movements
 	if (buttonPressed()) {
@@ -586,26 +625,18 @@ void poseUpdate() {
 	double delta=0.05;
 
 	// check shoulders
-	if (fabs(llwa.pos[0] - llwa_pos_target[0]) < delta) {
-		lshd_reached = true;
-	}
+	if (fabs(llwa.pos[0] - llwa_pos_target[0]) < delta) lshd_reached = true;
 
-	if (fabs(rlwa.pos[0] - rlwa_pos_target[0]) < delta) {
-		rshd_reached = true;
-	}
+	if (fabs(rlwa.pos[0] - rlwa_pos_target[0]) < delta) rshd_reached = true;
 
 	// check arm configuration
     llwa_reached = checkArm(llwa.pos, llwa_pos_target, delta);
 	rlwa_reached = checkArm(rlwa.pos, rlwa_pos_target, delta);
 
 	// half if arms positions reached
-	if (lshd_reached && llwa_reached) {
-		somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
-	}
+	if (lshd_reached && llwa_reached) somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
 
-	if (rshd_reached && rlwa_reached) {
-		somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
-	}
+	if (rshd_reached && rlwa_reached) somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
 
 	// check torso configuration
 	if (fabs(torso.pos[0] - torso_pos_target) < delta) {
@@ -638,6 +669,9 @@ void run() {
 	// Send the stoppig event
 	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
 					SOMATIC__EVENT__CODES__PROC_STOPPING, NULL, NULL);
+
+	// close our write file
+	out_file.close();
 }
 
 /* ********************************************************************************************* */
