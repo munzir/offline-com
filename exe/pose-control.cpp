@@ -119,10 +119,12 @@ vector<vector<double>> presetArmConfsR;
 /* ********************************************************************************************* */
 /// Read and write poses to file
 void readPoseFile() {
+    cout << "reading pose file" << endl;
 	ifstream in_file("poses.txt");
 	int count = 0;
 	string line;
 	while(getline(in_file,line)){
+		cout << "new line" << line << endl;
 		stringstream lineStream(line);
 		string t;
 		double d;
@@ -138,6 +140,7 @@ void readPoseFile() {
 		((count % 2) == 0) ? presetArmConfsL.push_back(pose) : presetArmConfsR.push_back(pose);
 		++count;
 	}
+	cout << "read over" << end;
 	in_file.close();
 }
 
@@ -272,7 +275,6 @@ double getIMUState(){
 	return _imu;
 }
 
-
 /* ********************************************************************************************* */
 /// record data for offline COM analysis
 void recordData() {
@@ -367,6 +369,7 @@ void controlShoulders() {
 
 			// update target
 			llwa_pos_target[0] = llwa_pos_default[0];
+			cout << "new left shoulder target " << llwa_pos_target[0] << endl;
 
 			// if we reached the previous destination, reset reached flag
 			if (lshd_reached) {
@@ -408,6 +411,7 @@ void controlShoulders() {
 
 			// update target
 			rlwa_pos_target[0] = rlwa_pos_default[0];
+			cout << "new right shoulder target " << rlwa_pos_target[0] << endl;
 
 			// if we reached the previous destination, reset reached flag
 			if (rshd_reached) {
@@ -433,6 +437,7 @@ void controlShoulders() {
 					rshd_dir = -1;
 				}
 				rlwa_pos_target[0] += (shoulder_stepsize * rshd_dir);
+				cout << "new right shoulder target " << rlwa_pos_target[0] << endl;
 				rshd_reached = false;
 			}
 		}
@@ -446,7 +451,13 @@ void updateArmTarget(double targetPose[], vector<double> configPose) {
 		targetPose[i] = configPose[i];
 	}
 }
-
+void printArmPos(double pos[], string dir) {
+	cout << "new " << dir << " arm target";
+	for (int i =0; i < 7; ++i) {
+		cout << pos[i];
+	}
+	cout << endl;
+}
 /* ********************************************************************************************* */
 /// Handles arm configurations
 void controlArms() {
@@ -459,6 +470,7 @@ void controlArms() {
 			pose_mv = true;
 			// update target
 			updateArmTarget(llwa_pos_target, llwa_pos_default);
+//			printArmPos(llwa_pos_target, "left");
 			// if we reached the previous destination, reset reached flag
 			if (llwa_reached) {
 				llwa_reached = false;
@@ -477,9 +489,14 @@ void controlArms() {
 			// we only update our target if we have reach our previous target or the direction is difference
 			if (llwa_reached || (((b[0] == 1) && (llwa_dir == -1)) || ((b[1] == 1) && (llwa_dir == 1)))) {
 				// if reached previous location, decrease/increase target by step
-				llwa_dir = (b[0] == 1) ? 1 : -1;
+                if (b[0] == 1) {
+                	llwa_dir = 1;
+                } else {
+                	llwa_dir = -1;
+                }
 				llwa_config_idx = (llwa_config_idx + llwa_dir) % sizeof(presetArmConfsL);
 				updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
+//				printArmPos(llwa_pos_target, "left");
 				lshd_reached = false;
 			}
 		}
@@ -494,6 +511,7 @@ void controlArms() {
 			pose_mv = true;
 			// update target
 			updateArmTarget(rlwa_pos_target, rlwa_pos_default);
+//			printArmPos(rlwa_pos_target, "right");
 			// if we reached the previous destination, reset reached flag
 			if (rlwa_reached) {
 				rlwa_reached = false;
@@ -512,9 +530,14 @@ void controlArms() {
 
 			if (rlwa_reached || (((b[0] == 1) && (rlwa_dir == -1)) || ((b[1] == 1) && (rlwa_dir == 1)))) {
 				// if reached previous location, decrease/increase target by step
-				rlwa_dir = (b[0] == 1) ? 1 : -1;
+				if (b[0] == 1) {
+					rlwa_dir = 1;
+				} else {
+					rlwa_dir = -1;
+				}
 				rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % sizeof(presetArmConfsR);
 				updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
+//				printArmPos(rlwa_pos_target, "right");
 				rlwa_reached = false;
 			}
 		}
@@ -537,6 +560,7 @@ void controlTorso() {
 
 			// update target
 			torso_pos_target = torso_pos_default;
+			cout << "new torso target " << torso_pos_target << endl;
 
 			// if we reached the previous destination, reset reached flag
 			if (torso_reached) {
@@ -556,9 +580,13 @@ void controlTorso() {
 
 			if (torso_reached || (((x[3] > 0.9) && (torso_dir == -1)) || ((x[3] > 0.9) && (torso_dir == 1)))) {
 				// if reached previous location, decrease/increase target by step
-				torso_dir = (b[0] == 1) ? 1 : -1;
-				updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
-				torso_pos_target += torso_stepsize * torso_dir;
+                if (b[0] == 1) {
+                	torso_dir = 1;
+                } else {
+                	torso_dir = -1;
+                }
+				torso_pos_target += (torso_stepsize * torso_dir);
+                cout << "new torso target " << torso_pos_target << endl;
 				torso_reached = false;
 			}
 		}
@@ -689,6 +717,8 @@ void poseUpdate() {
 void run() {
 	//get initial states
 	init_pos_targ();
+
+	readPoseFile();
 
 	// Unless an interrupt or terminate message is received, process the new message
 	while(!somatic_sig_received) {
