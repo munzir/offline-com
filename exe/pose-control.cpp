@@ -36,9 +36,9 @@
 #include "initModules.h"
 #include "motion.h"
 #include <iostream>
-#include <iostream>
 #include <fstream>
 #include <vector>
+#include <sstream>
 
 using namespace std;
 
@@ -66,7 +66,6 @@ Somatic__WaistCmd *waistDaemonCmd = somatic_waist_cmd_alloc();		///< The waist c
 char b[10];
 double x[6];
 
-bool hlt = false;
 bool input_end = true;
 
 bool pose_mv = false;
@@ -92,9 +91,9 @@ double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double rlwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double torso_pos_target = 0.0;
 
-double llwa_pos_default[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-double rlwa_pos_default[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-double torso_pos_default = -5.26;
+vector<double> llwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+vector<double> rlwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+double torso_pos_default = 0.0;
 
 int llwa_config_idx = 0;
 int rlwa_config_idx = 0;
@@ -114,25 +113,30 @@ int rlwa_config_idx = 0;
 //		{  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000},
 //};
 
-vector<double[7]> presetArmConfsL;
-vector<double[7]> presetArmConfsR;
+vector<vector<double>> presetArmConfsL;
+vector<vector<double>> presetArmConfsR;
 
 /* ********************************************************************************************* */
 /// Read and write poses to file
 void readPoseFile() {
 	ifstream in_file("poses.txt");
-	count = 0;
-	while(getline(in,line)){
+	int count = 0;
+	string line;
+	while(getline(in_file,line)){
 		stringstream lineStream(line);
-		string num;
-		double pose[7];
-		int i = 0;
-		while(getline(lineStream, num, ',')) {
-			istringstream convert(num);
-			convert >> pose[i];
-			++i;
+		string t;
+		double d;
+		vector<double> pose;
+		cout << "read number ";
+		while(getline(lineStream, t, ',')) {
+			istringstream convert(t);
+			convert >> d;
+			cout << d;
+			pose.push_back(d);
 		}
+		cout << endl;
 		((count % 2) == 0) ? presetArmConfsL.push_back(pose) : presetArmConfsR.push_back(pose);
+		++count;
 	}
 	in_file.close();
 }
@@ -220,7 +224,7 @@ void haltMovement () {
 
 	// Halt Torso
 	double dq [] = {0.0};
-	somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, NULL, 1, NULL);
+	somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
 	somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
 
 	// Halt Waist
@@ -320,7 +324,7 @@ bool buttonPressed() {
 	}
 
 	// valid waist command
-	if ((x[5] < -0.9) || (x[5] > 0.9)) {
+	if ((x[5] < -0.9) && (x[5] > 0.9)) {
 		return true;
 	}
 
@@ -365,7 +369,7 @@ void controlShoulders() {
 
 			// if we reached the previous destination, reset reached flag
 			if (lshd_reached) {
-				lsdh_dir = 0;
+				lshd_dir = 0;
 				lshd_reached = false;
 			}
 		}
@@ -401,7 +405,7 @@ void controlShoulders() {
 
 			// if we reached the previous destination, reset reached flag
 			if (rshd_reached) {
-			    rsdh_dir = 0;
+			    rshd_dir = 0;
 				rshd_reached = false;
 			}
 		}
@@ -426,7 +430,7 @@ void controlShoulders() {
 	}
 }
 
-void updateArmTarget(double targetPose[], double configPose[]) {
+void updateArmTarget(double targetPose[], vector<double> configPose) {
 	// we are ignoring shoulder motor (idx = 0)
 	for (int i = 1; i < 7; ++i) {
 		targetPose[i] = configPose[i];
@@ -436,6 +440,7 @@ void updateArmTarget(double targetPose[], double configPose[]) {
 /* ********************************************************************************************* */
 /// Handles arm configurations
 void controlArms() {
+
 	// button 3 for reset to deafult position
 	if ((b[6] == 1) && (b[2] == 1)) {
 		if(!pose_mv && input_end) {
@@ -533,7 +538,7 @@ void controlTorso() {
 	}
 
 	// buttons 1 and 2 are for forward/backward position toggles
-	if (((x[3] > 0.9) && (b[0] == 1))  ((x[3] > 0.9) && (b[1] == 1))) {
+	if (((x[3] > 0.9) && (b[0] == 1)) || ((x[3] > 0.9) && (b[1] == 1))) {
 		if (!pose_mv && input_end) {
 			// if not moving currently, update reset and move flags
 			torso_reset = true;
@@ -570,10 +575,10 @@ void processJS() {
 	// if no buttons are actively pressed we halt all movements
 	if (buttonPressed()) {
 		input_end = false;
+		cout << "button pressed" << endl;
 	} else {
 		input_end = true;
 		pose_mv = false;
-		hlt = true;
 	}
 
 }
@@ -601,6 +606,8 @@ void applyMove() {
 		somatic_motor_cmd(&daemon_cx, &llwa, POSITION, llwa_pos_target, 7, NULL);
 		somatic_motor_cmd(&daemon_cx, &rlwa, POSITION, rlwa_pos_target, 7, NULL);
 		somatic_motor_cmd(&daemon_cx, &torso, POSITION, torso_pos_array, 1, NULL);
+	} else {
+		haltMovement();
 	}
 }
 
@@ -624,22 +631,40 @@ void poseUpdate() {
 
 	double delta=0.05;
 
-	// check shoulders
-	if (fabs(llwa.pos[0] - llwa_pos_target[0]) < delta) lshd_reached = true;
 
-	if (fabs(rlwa.pos[0] - rlwa_pos_target[0]) < delta) rshd_reached = true;
+	// check shoulders
+	if ((fabs(llwa.pos[0] - llwa_pos_target[0]) < delta) && !lshd_reached) {
+		cout << "left shoulder target reached" << endl;
+		lshd_reached = true;
+	}
+
+
+	if ((fabs(rlwa.pos[0] - rlwa_pos_target[0]) < delta) && !rshd_reached) {
+		cout << "right shoulder target reached" << endl;
+		rshd_reached = true;
+	}
 
 	// check arm configuration
-    llwa_reached = checkArm(llwa.pos, llwa_pos_target, delta);
-	rlwa_reached = checkArm(rlwa.pos, rlwa_pos_target, delta);
+    if(checkArm(llwa.pos, llwa_pos_target, delta) && !llwa_reached) {
+		cout << "left arm target reached" << endl;
+		llwa_reached = true;
+
+	}
+
+	if(checkArm(rlwa.pos, rlwa_pos_target, delta) && !rlwa_reached) {
+		cout << "right arm target reached" << endl;
+		rlwa_reached = true;
+	}
 
 	// half if arms positions reached
-	if (lshd_reached && llwa_reached) somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
-
-	if (rshd_reached && rlwa_reached) somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);
+	if (lshd_reached && llwa_reached) haltArm(daemon_cx, llwa);
+	if (rshd_reached && rlwa_reached) haltArm(daemon_cx, rlwa);
 
 	// check torso configuration
-	if (fabs(torso.pos[0] - torso_pos_target) < delta) {
+	if ((fabs(torso.pos[0] - torso_pos_target) < delta) && !torso_reached) {
+		cout << "torso target reached" << endl;
+		double dq[] = {0.0};
+		somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
 		somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
 		torso_reached = true;
 	}
@@ -705,7 +730,6 @@ void destroy() {
 }
 
 int main() {
-	
 	init();
 	run();
 	destroy(); 
