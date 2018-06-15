@@ -115,12 +115,12 @@ int rlwa_config_idx = 0;
 
 vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
+ifstream in_file("poses.txt");
+ofstream out_file("data.txt");
 
 /* ********************************************************************************************* */
 /// Read and write poses to file
 void readPoseFile() {
-    cout << "reading pose file" << endl;
-	ifstream in_file("poses.txt");
 	int count = 0;
 	string line;
 	while(getline(in_file,line)){
@@ -140,11 +140,10 @@ void readPoseFile() {
 		((count % 2) == 0) ? presetArmConfsL.push_back(pose) : presetArmConfsR.push_back(pose);
 		++count;
 	}
-	cout << "read over" << end;
+	cout << "read over" << endl;
 	in_file.close();
 }
 
-ofstream out_file("data.txt");
 
 /* ********************************************************************************************* */
 /// Reads the joystick data into global variables 'b' and 'x', b for button press and x for axes data
@@ -470,7 +469,7 @@ void controlArms() {
 			pose_mv = true;
 			// update target
 			updateArmTarget(llwa_pos_target, llwa_pos_default);
-//			printArmPos(llwa_pos_target, "left");
+			printArmPos(llwa_pos_target, "left");
 			// if we reached the previous destination, reset reached flag
 			if (llwa_reached) {
 				llwa_reached = false;
@@ -496,7 +495,7 @@ void controlArms() {
                 }
 				llwa_config_idx = (llwa_config_idx + llwa_dir) % sizeof(presetArmConfsL);
 				updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
-//				printArmPos(llwa_pos_target, "left");
+				printArmPos(llwa_pos_target, "left");
 				lshd_reached = false;
 			}
 		}
@@ -511,7 +510,7 @@ void controlArms() {
 			pose_mv = true;
 			// update target
 			updateArmTarget(rlwa_pos_target, rlwa_pos_default);
-//			printArmPos(rlwa_pos_target, "right");
+			printArmPos(rlwa_pos_target, "right");
 			// if we reached the previous destination, reset reached flag
 			if (rlwa_reached) {
 				rlwa_reached = false;
@@ -537,7 +536,7 @@ void controlArms() {
 				}
 				rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % sizeof(presetArmConfsR);
 				updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
-//				printArmPos(rlwa_pos_target, "right");
+				printArmPos(rlwa_pos_target, "right");
 				rlwa_reached = false;
 			}
 		}
@@ -649,7 +648,6 @@ void applyMove() {
 	}
 
 	if (pose_mv) {
-		cout << "moving left arm to target" << llwa_pos_target[0] << endl;
 		double torso_pos_array[1] = {torso_pos_target};
 		somatic_motor_cmd(&daemon_cx, &llwa, POSITION, llwa_pos_target, 7, NULL);
 		somatic_motor_cmd(&daemon_cx, &rlwa, POSITION, rlwa_pos_target, 7, NULL);
@@ -675,7 +673,7 @@ void poseUpdate() {
 	somatic_motor_update(&daemon_cx, &rlwa);
 	somatic_motor_update(&daemon_cx, &torso);
 
-	double delta=0.05;
+	double delta=0.01;
 
 
 	// check shoulders
