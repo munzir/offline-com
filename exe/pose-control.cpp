@@ -200,22 +200,53 @@ void init() {
 }
 
 /* ********************************************************************************************* */
+/// Set Torso Target
+void resetTorsoTarget() {
+	somatic_motor_update(&daemon_cx, &torso);
+	torso_pos_target = torso.pos[0];
+}
+
+/* ********************************************************************************************* */
+/// Set left shoulder Target
+void resetLlshTarget() {
+	llwa_pos_target[0] = llwa.pos[0];
+}
+
+/* ********************************************************************************************* */
+/// Set right shoulder Target
+void resetRlshTarget() {
+	rlwa_pos_target[0] = rlwa.pos[0];
+}
+
+/* ********************************************************************************************* */
+/// Set left arm Target
+void resetLlwaTarget() {
+	for (int i = 1; i < 7; ++i) {
+		llwa_pos_target[i] = llwa.pos[i];
+	}
+}
+
+/// Set right arm Target
+void resetRlwaTarget() {
+	for (int i = 1; i < 7; ++i) {
+		rlwa_pos_target[i] = rlwa.pos[i];
+	}
+}
+
+/* ********************************************************************************************* */
 /// Set initial position targets for arms and torso to existing positions
 void init_pos_targ() {
 
 	somatic_motor_update(&daemon_cx, &llwa);
 	somatic_motor_update(&daemon_cx, &rlwa);
-	for (int i = 0; i < 7; ++i) {
-		llwa_pos_target[i] = llwa.pos[i];
-	}
-	for (int i = 0; i < 7; ++i) {
-		rlwa_pos_target[i] = rlwa.pos[i];
-	}
-
-	somatic_motor_update(&daemon_cx, &torso);
-	torso_pos_target = torso.pos[0];
+	resetLlshTarget();
+	resetRlshTarget();
+	resetLlwaTarget();
+	resetRlwaTarget();
+	resetTorsoTarget();
 
 }
+
 
 /* ********************************************************************************************* */
 /// stop all movements
@@ -311,17 +342,16 @@ void recordData() {
 /// check if one of the numerical buttons is being pressed
 bool buttonPressed() {
     // if we are logging
-	if (b[3] == 1) {
+	if (b[9] == 1) {
 		return true;
 	}
 
-	// arm and shoulder configs
-	if (((b[4] == 1) || (b[5] == 1) || (b[6] == 1) || (b[7] == 1)) && ((b[0] == 1) || (b[1] == 1) || (b[2] == 1))) {
-		return true;
-	}
+	bool command_btn = ((b[0] == 1) || (b[1] == 1) || (b[2] == 1) || (b[3] == 1));
 
-	// torso commands
-	if ((x[3] > 0.9) && ((b[0] == 1) || (b[1] == 1) || (b[2] == 1))) {
+	bool part_btn = ((b[4] == 1) || (b[5] == 1) || (b[6] == 1) || (b[7] == 1) || (x[3] > 0.9));
+
+	// arm, shoulder & torso configs
+	if (part_btn && command_btn)  {
 		return true;
 	}
 
@@ -358,6 +388,11 @@ void controlWaist() {
 void controlShoulders() {
 
 	double shoulder_stepsize = 0.2;
+
+	// button 4 for reset current target
+	if ((b[4] == 1) && (b[3] == 1)) {
+	    resetLlshTarget();
+	}
 
 	// button 3 for reset to deafult position
 	if ((b[4] == 1) && (b[2] == 1)) {
@@ -400,6 +435,11 @@ void controlShoulders() {
 		}
 		return;
 	}
+
+    // button 4 for reset current target
+    if ((b[5] == 1) && (b[3] == 1)) {
+        resetRlshTarget();
+    }
 
 	// button 3 for reset to deafult position
 	if ((b[5] == 1) && (b[2] == 1)) {
@@ -453,13 +493,18 @@ void updateArmTarget(double targetPose[], vector<double> configPose) {
 void printArmPos(double pos[], string dir) {
 	cout << "new " << dir << " arm target";
 	for (int i =0; i < 7; ++i) {
-		cout << pos[i];
+		cout << pos[i] << ", ";
 	}
 	cout << endl;
 }
 /* ********************************************************************************************* */
 /// Handles arm configurations
 void controlArms() {
+
+	// button 4 for reset current target
+	if ((b[6] == 1) && (b[3] == 1)) {
+		resetLlwaTarget();
+	}
 
 	// button 3 for reset to deafult position
 	if ((b[6] == 1) && (b[2] == 1)) {
@@ -493,13 +538,21 @@ void controlArms() {
                 } else {
                 	llwa_dir = -1;
                 }
-				llwa_config_idx = (llwa_config_idx + llwa_dir) % sizeof(presetArmConfsL);
+                cout << "left arm config id " << llwa_config_idx;
+				cout << "size of preset config " <<(presetArmConfsL.size());
+				llwa_config_idx = (llwa_config_idx + llwa_dir) % presetArmConfsL.size();
+				cout << "left arm config id " << llwa_config_idx;
 				updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
 				printArmPos(llwa_pos_target, "left");
-				lshd_reached = false;
+				llwa_reached = false;
 			}
 		}
 		return;
+	}
+
+	// button 4 for reset current target
+	if ((b[7] == 1) && (b[3] == 1)) {
+		resetRlwaTarget();
 	}
 
 	// button 3 for reset to deafult position
@@ -534,7 +587,7 @@ void controlArms() {
 				} else {
 					rlwa_dir = -1;
 				}
-				rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % sizeof(presetArmConfsR);
+				rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % presetArmConfsR.size();
 				updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
 				printArmPos(rlwa_pos_target, "right");
 				rlwa_reached = false;
@@ -549,6 +602,11 @@ void controlArms() {
 void controlTorso() {
 
 	double torso_stepsize = 0.1;
+
+	// button 4 for reset current target
+	if ((x[3] > 0.9) && (b[3] == 1)) {
+		resetTorsoTarget();
+	}
 
 	// button 3 for reset to deafult position
 	if ((x[3] > 0.9) && (b[2] == 1)) {
@@ -607,7 +665,7 @@ void processJS() {
     controlTorso();
 
 	// When button 4 is pressed we record our pose
-	if (b[3] == 1) recordData();
+	if (b[9] == 1) recordData();
 
 	// if no buttons are actively pressed we halt all movements
 	if (buttonPressed()) {
