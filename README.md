@@ -12,5 +12,5 @@ The left directional pad is used for waist, going up to increase the waist angle
 
 Button 10 is used to record pose data, which will stored them in a file and display them on screen. 
 
-#IO Files
+# IO Files
 The arm poses are to be read from poses.txt, one line per arm pose (alternating left/right). The pose output readings will be saved in data.txt, 1 line per pose (left arm, right arm, torso, waist, imu reading).
