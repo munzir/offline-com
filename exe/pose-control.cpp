@@ -133,34 +133,29 @@ ofstream out_file("data.txt");
 void readPoseFile() {
 	int count = 0;
 	string line;
-	while(getline(in_file,line)){
+	while(getline(in_file,line)) {
 		cout << "new line" << line << endl;
 		stringstream lineStream(line);
 		string t;
 		double d;
-		if (count % 2 == 0) {
-			vector<double> poseL;
-			cout << "read number ";
-			while(getline(lineStream, t, ',')) {
-				istringstream convert(t);
-				convert >> d;
-				cout << d;
+		vector<double> poseL;
+		vector<double> poseR;
+		int i = 0;
+		cout << "read number ";
+		while (getline(lineStream, t, ',')) {
+			istringstream convert(t);
+			convert >> d;
+			cout << d;
+			if (i < 7) {
 				poseL.push_back(d);
-			}
-			presetArmConfsL.push_back(poseL);
-			cout << endl;
-		} else {
-			vector<double> poseR;
-			cout << "read number ";
-			while(getline(lineStream, t, ',')) {
-				istringstream convert(t);
-				convert >> d;
-				cout << d;
+			} else {
 				poseR.push_back(d);
 			}
-			presetArmConfsR.push_back(poseR);
-			cout << endl;
+			i++;
 		}
+		cout << endl;
+		presetArmConfsL.push_back(poseL);
+		presetArmConfsR.push_back(poseR);
 		++count;
 	}
 	cout << "read over" << endl;
@@ -244,14 +239,14 @@ void resetRlshTarget() {
 /* ********************************************************************************************* */
 /// Set left arm Target
 void resetLlwaTarget() {
-	for (int i = 1; i < 7; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		llwa_pos_target[i] = llwa.pos[i];
 	}
 }
 
 /// Set right arm Target
 void resetRlwaTarget() {
-	for (int i = 1; i < 7; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		rlwa_pos_target[i] = rlwa.pos[i];
 	}
 }
@@ -259,7 +254,6 @@ void resetRlwaTarget() {
 /* ********************************************************************************************* */
 /// Set initial position targets for arms and torso to existing positions
 void init_pos_targ() {
-
 	somatic_motor_update(&daemon_cx, &llwa);
 	somatic_motor_update(&daemon_cx, &rlwa);
 	resetLlshTarget();
@@ -267,7 +261,6 @@ void init_pos_targ() {
 	resetLlwaTarget();
 	resetRlwaTarget();
 	resetTorsoTarget();
-
 }
 
 
@@ -507,8 +500,7 @@ void controlShoulders() {
 }
 
 void updateArmTarget(double targetPose[], vector<double> configPose) {
-	// we are ignoring shoulder motor (idx = 0)
-	for (int i = 1; i < 7; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		targetPose[i] = configPose[i];
 	}
 }
@@ -714,14 +706,13 @@ void moveShoulder(somatic_motor_t &arm, double target[] ) {
 		sh_target[i] = arm.pos[i];
 	}
 	sh_target[0] = target[0];
-	somatic_motor_cmd(&daemon_cx, &arm, POSITION, sh_target, 7, NULL);
 }
 
 /* ********************************************************************************************* */
 /// move arm
 void moveArm(somatic_motor_t &arm, double target[] ) {
 	double arm_target[7] = {0, 0, 0, 0, 0, 0, 0};
-	for (int i = 1; i < 7; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		arm_target[i] = target[i];
 	}
 	arm_target[0] = arm.pos[0];
@@ -778,9 +769,9 @@ void applyMove() {
 }
 
 /* ********************************************************************************************* */
-/// check the 6 motors (indexed 1 to 6) of the arm position and match with pose target
+/// check the 7 motors (indexed 0 to 6) of the arm position and match with pose target
 bool checkArm(double pos[7], double target[7], double del) {
-   for (int i = 1; i < 7; ++i) {
+   for (int i = 0; i < 7; ++i) {
        if (fabs(pos[i] - target[i]) >= del) {
            return false;
        }
@@ -795,18 +786,6 @@ void poseUpdate() {
 	somatic_motor_update(&daemon_cx, &llwa);
 	somatic_motor_update(&daemon_cx, &rlwa);
 	somatic_motor_update(&daemon_cx, &torso);
-
-	// check shoulders
-	if ((fabs(llwa.pos[0] - llwa_pos_target[0]) < POSE_ERROR) && !lshd_reached) {
-		cout << "left shoulder target reached" << endl;
-		lshd_reached = true;
-	}
-
-
-	if ((fabs(rlwa.pos[0] - rlwa_pos_target[0]) < POSE_ERROR) && !rshd_reached) {
-		cout << "right shoulder target reached" << endl;
-		rshd_reached = true;
-	}
 
 	// check arm configuration
     if(checkArm(llwa.pos, llwa_pos_target, POSE_ERROR) && !llwa_reached) {
