@@ -156,11 +156,10 @@ void readPoseFile() {
 				istringstream convert(t);
 				convert >> d;
 				cout << d;
-				poseL.push_back(d);
+				poseR.push_back(d);
 			}
-			poseR.push_back(d);
-			cout << endl;
 			presetArmConfsR.push_back(poseR);
+			cout << endl;
 		}
 		++count;
 	}
