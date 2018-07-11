@@ -51,6 +51,7 @@ somatic_d_t daemon_cx;
 ach_channel_t js_chan;				
 ach_channel_t state_chan;
 ach_channel_t waistCmdChan;
+ach_channel_t waistChan;
 somatic_motor_t llwa, rlwa, torso;
 
 // Why do we need to allocate memory for waist command but not others?
@@ -163,6 +164,22 @@ void controlWaist() {
 	int r = SOMATIC_PACK_SEND(&waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
 	if(ACH_OK != r) fprintf(stderr, "Couldn't send message: %s\n", 
 		ach_result_to_string(static_cast<ach_status_t>(r)));
+
+	double w_val = getWaistState();
+	if ((x[5] < -0.9) || (x[5] > 0.9)) { cout << "waist pose: " << w_val << endl; }
+}
+
+/* ********************************************************************************************* */
+/// update waist state value
+double getWaistState(){
+	struct timespec currTime;
+	clock_gettime(CLOCK_MONOTONIC, &currTime);
+	struct timespec abstime = aa_tm_add(aa_tm_sec2timespec(1.0/30.0), currTime);
+	int r;
+	Somatic__MotorState *waist = NULL;
+	while(waist == NULL) waist = getMotorMessage(waistChan);
+	double waist_val = (waist->position->data[0] - waist->position->data[1]) / 2.0;
+	return waist_val;
 }
 
 /* ********************************************************************************************* */
@@ -256,6 +273,7 @@ void init () {
 
 	// Initialize the waist channel
 	somatic_d_channel_open(&daemon_cx, &waistCmdChan, "waistd-cmd", NULL);
+	somatic_d_channel_open(&daemon_cx, &waistChan, "waist-state", NULL);
 }
 
 /* ********************************************************************************************* */
@@ -269,6 +287,7 @@ void destroy() {
 	ach_status_t r = SOMATIC_PACK_SEND( &waistCmdChan, somatic__waist_cmd, waistDaemonCmd );
 	if(ACH_OK != r) fprintf(stderr, "Couldn't send message: %s\n", ach_result_to_string(r));
 	somatic_d_channel_close(&daemon_cx, &waistCmdChan);
+	somatic_d_channel_close(&daemon_cx, &waistChan);
 
 	// Halt the Schunk modules
 	somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 7, NULL);

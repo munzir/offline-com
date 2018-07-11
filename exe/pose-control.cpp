@@ -101,6 +101,7 @@ double torso_pos_default = 0.0;
 
 int llwa_config_idx = 0;
 int rlwa_config_idx = 0;
+int torso_config_idx = 0;
 
 // The preset arm configurations: forward, thriller, more forward for balancing, zero
 //double presetArmConfsL [][7] = {
@@ -119,8 +120,12 @@ int rlwa_config_idx = 0;
 
 vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
+vector<double> presetTorsoConfs;
+
 ifstream in_file("poses.txt");
 ofstream out_file("data.txt");
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* ********************************************************************************************* */
 /// Read and write poses to file
@@ -129,6 +134,7 @@ void readPoseFile() {
 	string line;
 	presetArmConfsL.push_back(llwa_pos_default);
 	presetArmConfsR.push_back(rlwa_pos_default);
+	presetTorsoConfs.push_back(torso_pos_default);
 	while(getline(in_file,line)) {
 		cout << "new line" << line << endl;
 		stringstream lineStream(line);
@@ -136,18 +142,21 @@ void readPoseFile() {
 		double d;
 		vector<double> poseL;
 		vector<double> poseR;
-
 		int i = 0;
 		cout << "read number ";
 		while (getline(lineStream, t, ',')) {
 			istringstream convert(t);
 			convert >> d;
 			cout << d;
-			if (i < 7) {
+			if (i < 1) {
+				presetTorsoConfs.push_back(d);
+			}
+			if (i < 8) {
 				poseL.push_back(d);
 			} else {
 				poseR.push_back(d);
 			}
+
 			i++;
 		}
 		cout << endl;
@@ -159,7 +168,7 @@ void readPoseFile() {
 	cout << "total configurations read:" << count << endl;
 	in_file.close();
 
-	/* cout << "left arm configurations: " << endl;
+	cout << "left arm configurations: " << endl;
 	for (auto c : presetArmConfsL) {
 		for (auto d : c) {
 			cout << d << ", ";
@@ -174,117 +183,14 @@ void readPoseFile() {
 		}
 		cout << endl;
 	}
-	*/
-}
 
-
-/* ********************************************************************************************* */
-/// Reads the joystick data into global variables 'b' and 'x', b for button press and x for axes data
-void readJoystick() {
-
-	// Get the message and check output is OK.
-	int r = 0;
-	Somatic__Joystick *js_msg =
-			SOMATIC_GET_LAST_UNPACK( r, somatic__joystick, &protobuf_c_system_allocator, 4096, &js_chan );
-	if(!(ACH_OK == r || ACH_MISSED_FRAME == r) || (js_msg == NULL)) return;
-
-	// Save values from joystick message buttons and save them to b
-	for(size_t i = 0; i < 10; i++)
-		b[i] = js_msg->buttons->data[i] ? 1 : 0;
-
-	// Copy over axes data
-	memcpy(x, js_msg->axes->data, sizeof(x));
-
-	// Free the joystick message
-	somatic__joystick__free_unpacked(js_msg, &protobuf_c_system_allocator);
-}
-
-/* ********************************************************************************************* */
-/// Initialize arms and torso with somatic motors. Initialize waist command/state, imu, and joystick channels
-void init() {
-
-	// initialize daemon with options
-	somatic_d_opts_t dopt;
-	memset(&dopt, 0, sizeof(dopt)); // zero initialize
-	dopt.ident = "pose-ctrl";
-	somatic_d_init( &daemon_cx, &dopt);
-
-	// Initialize the arms and torso module
-	initArm(daemon_cx, llwa, "llwa");
-	initArm(daemon_cx, rlwa, "rlwa");
-	initTorso(daemon_cx, torso);
-
-	// Initialize the waist channels
-	somatic_d_channel_open(&daemon_cx, &waistChan, "waist-state", NULL);
-	somatic_d_channel_open(&daemon_cx, &waistCmdChan, "waistd-cmd", NULL);
-
-	// Initialize IMU Data
-	initIMU(daemon_cx, imuChan);
-
-	// Initialize the joystick channel
-	int r = ach_open(&js_chan, "joystick-data", NULL);
-	aa_hard_assert(r == ACH_OK, "Ach failure '%s' on opening Joystick channel (%s, line %d)\n",
-				   ach_result_to_string(static_cast<ach_status_t>(r)), __FILE__, __LINE__);
-
-	// Send a message; set the event code and the priority
-	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
-					SOMATIC__EVENT__CODES__PROC_RUNNING, NULL, NULL);
-
-}
-
-/* ********************************************************************************************* */
-/// Set Torso Target
-void resetTorsoTarget() {
-	somatic_motor_update(&daemon_cx, &torso);
-	torso_pos_target = torso.pos[0];
-}
-
-/* ********************************************************************************************* */
-/// Set left arm Target
-void resetLlwaTarget() {
-	for (int i = 0; i < 7; ++i) {
-		llwa_pos_target[i] = llwa.pos[i];
+	cout << "torso configurations" << endl;
+	for (auto c : presetTorsoConfs) {
+		cout << c << endl;
 	}
 }
 
-/// Set right arm Target
-void resetRlwaTarget() {
-	for (int i = 0; i < 7; ++i) {
-		rlwa_pos_target[i] = rlwa.pos[i];
-	}
-}
 
-/* ********************************************************************************************* */
-/// Set initial position targets for arms and torso to existing positions
-void init_pos_targ() {
-	somatic_motor_update(&daemon_cx, &llwa);
-	somatic_motor_update(&daemon_cx, &rlwa);
-	resetLlwaTarget();
-	resetRlwaTarget();
-	resetTorsoTarget();
-}
-
-
-/* ********************************************************************************************* */
-/// stop all movements
-void haltMovement () {
-	// Halt Arm
-	cout << "halting movements" << endl;
-	haltArm(daemon_cx, llwa);
-	haltArm(daemon_cx, rlwa);
-
-	// Halt Torso
-	double dq [] = {0.0};
-	somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
-	somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
-
-//	// Halt Waist
-//	static Somatic__WaistCmd *waistDaemonCmd = somatic_waist_cmd_alloc();
-//	somatic_waist_cmd_set(waistDaemonCmd, SOMATIC__WAIST_MODE__STOP);
-//	somatic_metadata_set_time_now(waistDaemonCmd->meta);
-//	somatic_metadata_set_until_duration(waistDaemonCmd->meta, .1);
-//	SOMATIC_PACK_SEND( &waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
-}
 
 /* ********************************************************************************************* */
 /// update waist state value
@@ -356,6 +262,132 @@ void recordData() {
 }
 
 /* ********************************************************************************************* */
+/// if D key is pressed, record krang state data
+void *kbhit(void *) {
+	char input;
+	double kOffset = 0.05;
+	while (true) {
+		input = cin.get();
+		pthread_mutex_lock(&mutex);
+		if (input == 'd') { recordData(); };
+		pthread_mutex_unlock(&mutex);
+	}
+}
+
+
+/* ********************************************************************************************* */
+/// Reads the joystick data into global variables 'b' and 'x', b for button press and x for axes data
+void readJoystick() {
+
+	// Get the message and check output is OK.
+	int r = 0;
+	Somatic__Joystick *js_msg =
+			SOMATIC_GET_LAST_UNPACK( r, somatic__joystick, &protobuf_c_system_allocator, 4096, &js_chan );
+	if(!(ACH_OK == r || ACH_MISSED_FRAME == r) || (js_msg == NULL)) return;
+
+	// Save values from joystick message buttons and save them to b
+	for(size_t i = 0; i < 10; i++)
+		b[i] = js_msg->buttons->data[i] ? 1 : 0;
+
+	// Copy over axes data
+	memcpy(x, js_msg->axes->data, sizeof(x));
+
+	// Free the joystick message
+	somatic__joystick__free_unpacked(js_msg, &protobuf_c_system_allocator);
+}
+
+/* ********************************************************************************************* */
+/// Initialize arms and torso with somatic motors. Initialize waist command/state, imu, and joystick channels
+void init() {
+
+	// initialize daemon with options
+	somatic_d_opts_t dopt;
+	memset(&dopt, 0, sizeof(dopt)); // zero initialize
+	dopt.ident = "pose-ctrl";
+	somatic_d_init( &daemon_cx, &dopt);
+
+	// Initialize the arms and torso module
+	initArm(daemon_cx, llwa, "llwa");
+	initArm(daemon_cx, rlwa, "rlwa");
+	initTorso(daemon_cx, torso);
+
+	// Initialize the waist channels
+	somatic_d_channel_open(&daemon_cx, &waistChan, "waist-state", NULL);
+	somatic_d_channel_open(&daemon_cx, &waistCmdChan, "waistd-cmd", NULL);
+
+	// Initialize IMU Data
+	initIMU(daemon_cx, imuChan);
+
+	// Initialize the joystick channel
+	int r = ach_open(&js_chan, "joystick-data", NULL);
+	aa_hard_assert(r == ACH_OK, "Ach failure '%s' on opening Joystick channel (%s, line %d)\n",
+				   ach_result_to_string(static_cast<ach_status_t>(r)), __FILE__, __LINE__);
+
+	// Send a message; set the event code and the priority
+	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
+					SOMATIC__EVENT__CODES__PROC_RUNNING, NULL, NULL);
+
+	// Create a thread to wait for user input to begin balancing
+	pthread_t kbhitThread;
+	pthread_create(&kbhitThread, NULL, &kbhit, NULL);
+}
+
+/* ********************************************************************************************* */
+/// Set Torso Target
+void resetTorsoTarget() {
+	somatic_motor_update(&daemon_cx, &torso);
+	torso_pos_target = torso.pos[0];
+}
+
+/* ********************************************************************************************* */
+/// Set left arm Target
+void resetLlwaTarget() {
+	for (int i = 0; i < 7; ++i) {
+		llwa_pos_target[i] = llwa.pos[i];
+	}
+}
+
+/// Set right arm Target
+void resetRlwaTarget() {
+	for (int i = 0; i < 7; ++i) {
+		rlwa_pos_target[i] = rlwa.pos[i];
+	}
+}
+
+/* ********************************************************************************************* */
+/// Set initial position targets for arms and torso to existing positions
+void init_pos_targ() {
+	somatic_motor_update(&daemon_cx, &llwa);
+	somatic_motor_update(&daemon_cx, &rlwa);
+	resetLlwaTarget();
+	resetRlwaTarget();
+	resetTorsoTarget();
+}
+
+/* ********************************************************************************************* */
+/// stop all movements
+void haltMovement () {
+	// Halt Arm
+	cout << "halting movements" << endl;
+	haltArm(daemon_cx, llwa);
+	haltArm(daemon_cx, rlwa);
+
+	// Halt Torso
+	double dq [] = {0.0};
+	somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
+	somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
+
+//	// Halt Waist
+//	static Somatic__WaistCmd *waistDaemonCmd = somatic_waist_cmd_alloc();
+//	somatic_waist_cmd_set(waistDaemonCmd, SOMATIC__WAIST_MODE__STOP);
+//	somatic_metadata_set_time_now(waistDaemonCmd->meta);
+//	somatic_metadata_set_until_duration(waistDaemonCmd->meta, .1);
+//	SOMATIC_PACK_SEND( &waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
+}
+
+
+
+/* ********************************************************************************************* */
 /// check if one of the numerical buttons is being pressed
 bool buttonPressed() {
     // if we are logging
@@ -380,25 +412,6 @@ bool buttonPressed() {
 	return false;
 }
 
-/* ********************************************************************************************* */
-/// Handles the joystick commands for the waist module
-void controlWaist() {
-
-	// Set the mode we want to send to the waist daemon, waist only moves when we are push joystick to max
-	Somatic__WaistMode waistMode;
-	if(x[5] < -0.9) waistMode = SOMATIC__WAIST_MODE__MOVE_FWD;
-	else if(x[5] > 0.9) waistMode = SOMATIC__WAIST_MODE__MOVE_REV;
-	else waistMode = SOMATIC__WAIST_MODE__STOP;
-
-	// Send message to the krang-waist daemon
-	somatic_waist_cmd_set(waistDaemonCmd, waistMode);
-	int r = SOMATIC_PACK_SEND(&waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
-	if(ACH_OK != r) fprintf(stderr, "Couldn't send message: %s\n",
-							ach_result_to_string(static_cast<ach_status_t>(r)));
-
-	double w_val = getWaistState();
-	if ((x[5] < -0.9) || (x[5] > 0.9)) { cout << "waist pose: " << w_val << endl; }
-}
 
 void updateArmTarget(double targetPose[], vector<double> configPose) {
 	for (int i = 0; i < 7; ++i) {
@@ -551,15 +564,16 @@ void controlTorso() {
 			torso_reset = true;
 			torso_mv = true;
 
-			if (torso_reached || (((x[1] > 0.9) && (torso_dir == -1)) || ((x[1] > 0.9) && (torso_dir == 1)))) {
+			if (torso_reached || (((b[0] == 1) && (torso_dir == -1)) || ((b[2] == 1) && (torso_dir == 1)))) {
 				// if reached previous location, decrease/increase target by step
                 if (b[0] == 1) {
                 	torso_dir = 1;
                 } else {
                 	torso_dir = -1;
                 }
-				torso_pos_target += (TORSO_STEP * torso_dir);
-                cout << "new torso target " << torso_pos_target << endl;
+                torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
+				torso_pos_target = presetTorsoConfs[torso_config_idx];
+				cout << "new torso target " << torso_pos_target << endl;
 				torso_reached = false;
 			}
 		}
@@ -571,14 +585,9 @@ void controlTorso() {
 /// handles joystick commands
 void processJS() {
 
-    controlWaist();
-
     controlArms();
 
     controlTorso();
-
-	// When button 4 is pressed we record our pose
-	if (b[9] == 1) recordData();
 
 	// if no buttons are actively pressed we halt all movements
 	if (buttonPressed()) {
@@ -596,7 +605,6 @@ void processJS() {
 	}
 
 }
-
 
 /* ********************************************************************************************* */
 /// move arm
