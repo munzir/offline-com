@@ -74,21 +74,15 @@ bool input_end = true;
 bool hlt_mv = false;
 
 bool pose_mv = false;
-bool llsh_mv = false;
-bool rlsh_mv = false;
 bool llwa_mv = false;
 bool rlwa_mv = false;
 bool torso_mv = false;
 
-bool lshd_reached = true;
-bool rshd_reached = true;
 bool llwa_reached = true;
 bool rlwa_reached = true;
 bool torso_reached = true;
 
 // 0 for initial value, 1 for clockwise, 2 for counter clockwise
-int lshd_dir = 0;
-int rshd_dir = 0;
 int llwa_dir = 0;
 int rlwa_dir = 0;
 int torso_dir = 0;
@@ -222,18 +216,6 @@ void init() {
 void resetTorsoTarget() {
 	somatic_motor_update(&daemon_cx, &torso);
 	torso_pos_target = torso.pos[0];
-}
-
-/* ********************************************************************************************* */
-/// Set left shoulder Target
-void resetLlshTarget() {
-	llwa_pos_target[0] = llwa.pos[0];
-}
-
-/* ********************************************************************************************* */
-/// Set right shoulder Target
-void resetRlshTarget() {
-	rlwa_pos_target[0] = rlwa.pos[0];
 }
 
 /* ********************************************************************************************* */
@@ -397,106 +379,6 @@ void controlWaist() {
 
 	double w_val = getWaistState();
 	if ((x[5] < -0.9) || (x[5] > 0.9)) { cout << "waist pose: " << w_val << endl; }
-}
-
-/* ********************************************************************************************* */
-/// Handles shoulders
-void controlShoulders() {
-
-
-	// button 4 for reset current target
-	if ((b[4] == 1) && (b[3] == 1)) {
-	    resetLlshTarget();
-	}
-
-	// button 2 for reset to deafult position
-	if ((b[4] == 1) && (b[1] == 1)) {
-		if(!llsh_mv && input_end) {
-			// if not moving currently, update reset and move flags
-			llwa_reset = true;
-			llsh_mv = true;
-
-			// update target
-			llwa_pos_target[0] = llwa_pos_default[0];
-			cout << "new left shoulder target " << llwa_pos_target[0] << endl;
-
-			// if we reached the previous destination, reset reached flag
-			if (lshd_reached) {
-				lshd_dir = 0;
-				lshd_reached = false;
-			}
-		}
-		return;
-	}
-
-	// buttons 1 and 3 are for clockwise/counterclockwise position change
-	if (((b[4]==1) && (b[0] == 1)) || ((b[4]==1) && (b[2] == 1))) {
-		if (!llsh_mv && input_end) {
-			// if not moving currently, update reset and move flags
-			llwa_reset = true;
-			llsh_mv = true;
-
-			// we only update our target if we have reach our previous target or the direction is difference
-			if (lshd_reached || (((b[0] == 1) && (lshd_dir == -1)) || ((b[2] == 1) && (lshd_dir == 1)))) {
-			    if (b[0] == 1) {
-			    	lshd_dir = 1;
-			    } else {
-			    	lshd_dir = -1;
-			    }
-				llwa_pos_target[0] += (SHOULDER_STEP * lshd_dir);
-			    cout << "new left shoulder target " << llwa_pos_target[0] << endl;
-				lshd_reached = false;
-			}
-		}
-		return;
-	}
-
-    // button 4 for reset current target
-    if ((b[5] == 1) && (b[3] == 1)) {
-        resetRlshTarget();
-    }
-
-	// button 2 for reset to deafult position
-	if ((b[5] == 1) && (b[1] == 1)) {
-		if(!rlsh_mv && input_end) {
-			// if not moving currently, update reset and move flags
-			rlwa_reset = true;
-			rlsh_mv = true;
-
-			// update target
-			rlwa_pos_target[0] = rlwa_pos_default[0];
-			cout << "new right shoulder target " << rlwa_pos_target[0] << endl;
-
-			// if we reached the previous destination, reset reached flag
-			if (rshd_reached) {
-			    rshd_dir = 0;
-				rshd_reached = false;
-			}
-		}
-		return;
-	}
-
-	// buttons 1 and 3 are for clockwise/counterclockwise position change
-	if (((b[5]==1) && (b[0] == 1)) || ((b[5]==1) && (b[2] == 1))) {
-		if (!rlsh_mv && input_end) {
-			// if not moving currently, update reset and move flags
-			rlwa_reset = true;
-			rlsh_mv = true;
-
-			// we only update our target if we have reach our previous target or the direction is difference
-			if (rshd_reached || (((b[0] == 1) && (rshd_dir == -1)) || ((b[2] == 1) && (rshd_dir == 1)))) {
-				if (b[0] == 1) {
-					rshd_dir = 1;
-				} else {
-					rshd_dir = -1;
-				}
-				rlwa_pos_target[0] += (SHOULDER_STEP * rshd_dir);
-				cout << "new right shoulder target " << rlwa_pos_target[0] << endl;
-				rshd_reached = false;
-			}
-		}
-		return;
-	}
 }
 
 void updateArmTarget(double targetPose[], vector<double> configPose) {
@@ -670,8 +552,6 @@ void processJS() {
 
     controlWaist();
 
-    controlShoulders();
-
     controlArms();
 
     controlTorso();
@@ -683,12 +563,10 @@ void processJS() {
 	if (buttonPressed()) {
 		input_end = false;
 	} else {
-		pose_mv = (llsh_mv || rlsh_mv || llwa_mv || rlwa_mv || torso_mv);
+		pose_mv = (llwa_mv || rlwa_mv || torso_mv);
 		if (pose_mv) { // released button while moving
 			hlt_mv = true;
 			pose_mv = false;
-			llsh_mv = false;
-			rlsh_mv = false;
 			llwa_mv = false;
 			rlwa_mv = false;
 			torso_mv = false;
@@ -698,15 +576,6 @@ void processJS() {
 
 }
 
-/* ********************************************************************************************* */
-/// move shoulder
-void moveShoulder(somatic_motor_t &arm, double target[] ) {
-	double sh_target[7] = {0, 0, 0, 0, 0, 0, 0};
-	for (int i = 1; i < 7; ++i) {
-		sh_target[i] = arm.pos[i];
-	}
-	sh_target[0] = target[0];
-}
 
 /* ********************************************************************************************* */
 /// move arm
@@ -746,14 +615,6 @@ void applyMove() {
 
 	usleep(1e5);
 
-	if (llsh_mv) {
-		somatic_motor_update(&daemon_cx, &llwa);
-		moveShoulder(llwa, llwa_pos_target);
-	}
-	if (rlsh_mv) {
-		somatic_motor_update(&daemon_cx, &rlwa);
-		moveShoulder(rlwa, rlwa_pos_target);
-	}
 	if (llwa_mv) {
 		somatic_motor_update(&daemon_cx, &llwa);
 		moveArm(llwa, llwa_pos_target);
