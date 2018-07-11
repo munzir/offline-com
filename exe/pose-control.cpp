@@ -138,19 +138,30 @@ void readPoseFile() {
 		stringstream lineStream(line);
 		string t;
 		double d;
-		vector<double> poseL;
-		vector<double> poseR;
-		cout << "read number ";
-		while(getline(lineStream, t, ',')) {
-			istringstream convert(t);
-			convert >> d;
-			cout << d;
-			poseL.push_back(d);
-			poseR.push_back(d * -1);
+		if (count % 2 == 0) {
+			vector<double> poseL;
+			cout << "read number ";
+			while(getline(lineStream, t, ',')) {
+				istringstream convert(t);
+				convert >> d;
+				cout << d;
+				poseL.push_back(d);
+			}
+			presetArmConfsL.push_back(poseL);
+			cout << endl;
+		} else {
+			vector<double> poseR;
+			cout << "read number ";
+			while(getline(lineStream, t, ',')) {
+				istringstream convert(t);
+				convert >> d;
+				cout << d;
+				poseL.push_back(d);
+			}
+			poseR.push_back(d);
+			cout << endl;
+			presetArmConfsR.push_back(poseR);
 		}
-		cout << endl;
-		presetArmConfsL.push_back(poseL);
-		presetArmConfsR.push_back(poseR);
 		++count;
 	}
 	cout << "read over" << endl;
