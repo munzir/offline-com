@@ -127,6 +127,8 @@ ofstream out_file("data.txt");
 void readPoseFile() {
 	int count = 0;
 	string line;
+	presetArmConfsL.push_back(llwa_pos_default);
+	presetArmConfsR.push_back(rlwa_pos_default);
 	while(getline(in_file,line)) {
 		cout << "new line" << line << endl;
 		stringstream lineStream(line);
@@ -134,6 +136,7 @@ void readPoseFile() {
 		double d;
 		vector<double> poseL;
 		vector<double> poseR;
+
 		int i = 0;
 		cout << "read number ";
 		while (getline(lineStream, t, ',')) {
@@ -153,7 +156,25 @@ void readPoseFile() {
 		++count;
 	}
 	cout << "read over" << endl;
+	cout << "total configurations read:" << count << endl;
 	in_file.close();
+
+	/* cout << "left arm configurations: " << endl;
+	for (auto c : presetArmConfsL) {
+		for (auto d : c) {
+			cout << d << ", ";
+		}
+		cout << endl;
+	}
+
+	cout << "right arm configurations: " << endl;
+	for (auto c : presetArmConfsR) {
+		for (auto d : c) {
+			cout << d << ", ";
+		}
+		cout << endl;
+	}
+	*/
 }
 
 
@@ -238,8 +259,6 @@ void resetRlwaTarget() {
 void init_pos_targ() {
 	somatic_motor_update(&daemon_cx, &llwa);
 	somatic_motor_update(&daemon_cx, &rlwa);
-	resetLlshTarget();
-	resetRlshTarget();
 	resetLlwaTarget();
 	resetRlwaTarget();
 	resetTorsoTarget();
@@ -424,6 +443,7 @@ void controlArms() {
 	// buttons 1 and 3 are for clockwise/counterclockwise position change
 	if (((b[6]==1) && (b[0] == 1)) || ((b[6]==1) && (b[2] == 1))) {
 		if (!llwa_mv && input_end) {
+		    cout << "new left arm config" << endl;
 			// if not moving currently, update reset and move flags
 			llwa_reset = true;
 			llwa_mv = true;
@@ -473,6 +493,7 @@ void controlArms() {
 	// buttons 1 and 3 are for clockwise/counterclockwise position change
 	if (((b[7]==1) && (b[0] == 1)) || ((b[7]==1) && (b[2] == 1))) {
 		if (!rlwa_mv && input_end) {
+			cout << "new right arm config" << endl;
 			// if not moving currently, update reset and move flags
 			rlwa_reset = true;
 			rlwa_mv = true;
@@ -584,7 +605,6 @@ void moveArm(somatic_motor_t &arm, double target[] ) {
 	for (int i = 0; i < 7; ++i) {
 		arm_target[i] = target[i];
 	}
-	arm_target[0] = arm.pos[0];
 	somatic_motor_cmd(&daemon_cx, &arm, POSITION, arm_target, 7, NULL);
 }
 
@@ -604,6 +624,7 @@ void applyMove() {
 	}
 
 	if (rlwa_reset) {
+		cout << "resetting right arm" << endl;
 		somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
 		rlwa_reset = false;
 	}
