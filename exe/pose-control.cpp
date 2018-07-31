@@ -122,8 +122,8 @@ vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
 vector<double> presetTorsoConfs;
 
-ifstream in_file("poses.txt");
-ofstream out_file("data.txt");
+ifstream in_file("../data/poses.txt");
+ofstream out_file("../data/out.txt", ios::app);
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -274,6 +274,9 @@ void *kbhit(void *) {
 		if (input == 'd') {
 			recordData();
 		};
+		if (input == 'x') {
+			out_file << "DELETE PREVIOUS LINE" << endl;
+		};
 		pthread_mutex_unlock(&mutex);
 	}
 }
@@ -389,8 +392,6 @@ void haltMovement () {
 //	SOMATIC_PACK_SEND( &waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
 }
 
-
-
 /* ********************************************************************************************* */
 /// check if one of the numerical buttons is being pressed
 bool buttonPressed() {
@@ -430,6 +431,7 @@ void printArmPos(double pos[], string dir) {
 	}
 	cout << endl;
 }
+
 /* ********************************************************************************************* */
 /// Handles arm configurations
 void controlArms() {
