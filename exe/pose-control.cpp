@@ -122,8 +122,8 @@ vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
 vector<double> presetTorsoConfs;
 
-ifstream in_file("poses.txt");
-ofstream out_file("data.txt");
+ifstream in_file("../data/poses.txt");
+ofstream out_file("../data/out.txt", ios::app);
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -144,20 +144,22 @@ void readPoseFile() {
 		vector<double> poseR;
 		int i = 0;
 		cout << "read number ";
-		while (getline(lineStream, t, ',')) {
-			istringstream convert(t);
-			convert >> d;
-			cout << d;
-			if (i < 1) {
-				presetTorsoConfs.push_back(d);
+		while (getline(lineStream, t, ' ')) {
+			if(!t.empty()) {
+				istringstream convert(t);
+				convert >> d;
+				cout << d;
+				if (i == 9) {
+					presetTorsoConfs.push_back(d);
+				}
+				if (i > 10 && i <= 17) {
+					poseL.push_back(d);
+				}
+				if (i > 17) {
+					poseR.push_back(d);
+				}
+				i++;
 			}
-			if (i < 8) {
-				poseL.push_back(d);
-			} else {
-				poseR.push_back(d);
-			}
-
-			i++;
 		}
 		cout << endl;
 		presetArmConfsL.push_back(poseL);
@@ -269,7 +271,12 @@ void *kbhit(void *) {
 	while (true) {
 		input = cin.get();
 		pthread_mutex_lock(&mutex);
-		if (input == 'd') { recordData(); };
+		if (input == 'd') {
+			recordData();
+		};
+		if (input == 'x') {
+			out_file << "DELETE PREVIOUS LINE" << endl;
+		};
 		pthread_mutex_unlock(&mutex);
 	}
 }
@@ -385,8 +392,6 @@ void haltMovement () {
 //	SOMATIC_PACK_SEND( &waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
 }
 
-
-
 /* ********************************************************************************************* */
 /// check if one of the numerical buttons is being pressed
 bool buttonPressed() {
@@ -426,6 +431,7 @@ void printArmPos(double pos[], string dir) {
 	}
 	cout << endl;
 }
+
 /* ********************************************************************************************* */
 /// Handles arm configurations
 void controlArms() {
