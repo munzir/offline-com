@@ -31,7 +31,7 @@
  * @date July 08, 2013
  * @brief This executable shows how to estimate the center of mass of the Krang and visualizes
  * the total center of mass and individual body nodes center of masses in grip with the data
- * read from the joints and imu sensor. 
+ * read from the joints and imu sensor.
  * Note if you want to move the joints, please use the home utility.
  */
 
@@ -89,8 +89,8 @@ void getData (filter_kalman_t* kf, double dt) {
 	while(waist == NULL) waist = getMotorMessage(waistChan);
 	while(leftArm == NULL) leftArm = getMotorMessage(leftArmChan);
 	while(rightArm == NULL) rightArm = getMotorMessage(rightArmChan);
-	
-	// Get the data from imu 
+
+	// Get the data from imu
 	double imu, imuSpeed;
 	getImu(&imuChan, imu, imuSpeed, dt, kf);
 
@@ -98,7 +98,7 @@ void getData (filter_kalman_t* kf, double dt) {
 	double waist_val = (waist->position->data[0] - waist->position->data[1]) / 2.0;
 	Vector2d imuWaist_vals (-imu + M_PI_2, waist_val);
 	robot->setConfig(imuWaist_ids, imuWaist_vals);
-	
+
 	// Update the robot state
 	Vector7d larm_vals = eig7(leftArm->position->data), rarm_vals = eig7(rightArm->position->data);
 	robot->setConfig(left_arm_ids, larm_vals);
@@ -111,7 +111,7 @@ void getData (filter_kalman_t* kf, double dt) {
 }
 
 /* ********************************************************************************************* */
-/// Picks a random configuration for the robot, moves it, does f.k. for the right and left 
+/// Picks a random configuration for the robot, moves it, does f.k. for the right and left
 /// end-effectors, places blue and green boxes for their locations and visualizes it all
 void Timer::Notify() {
 
@@ -131,20 +131,20 @@ void Timer::Notify() {
 	Vector3d com = robot->getWorldCOM();
 	com(2) -= 0.264;
 	double theta = atan2(com(0), com(2));
-	sprintf(buf, "com (cm): (%lf, %lf, %lf)\n\nbalancing angle (deg): %lf", 100.0 * com(0), 
+	sprintf(buf, "com (cm): (%lf, %lf, %lf)\n\nbalancing angle (deg): %lf", 100.0 * com(0),
 		100.0 * com(1), 100.0 * com(2), (theta / M_PI) * 180.0);
 	text->SetLabel(wxString(buf, wxConvUTF8));
-		
-	
+
+
 	// Clean up the daemon memory
 	aa_mem_region_release(&daemon_cx.memreg);
-	
+
 	// Restart the timer for the next start
-	Start(0.005 * 1e4);	
+	Start(0.005 * 1e4);
 }
 
 /* ********************************************************************************************* */
-SimTab::SimTab(wxWindow *parent, const wxWindowID id, const wxPoint& pos, const wxSize& size, 
+SimTab::SimTab(wxWindow *parent, const wxWindowID id, const wxPoint& pos, const wxSize& size,
 		long style) : GRIPTab(parent, id, pos, size, style) {
 
 	// ============================================================================
@@ -166,7 +166,7 @@ SimTab::SimTab(wxWindow *parent, const wxWindowID id, const wxPoint& pos, const 
 
 	// Create the timer to notify the function that draws the robot at multiple configurations
 	timer = new Timer();
-	timer->Start(1);	
+	timer->Start(1);
 
 	// ============================================================================
 	// Initialize robot stuff
@@ -193,21 +193,21 @@ SimTab::SimTab(wxWindow *parent, const wxWindowID id, const wxPoint& pos, const 
 	t_prev = aa_tm_now();
 
 	// Send a message; set the event code and the priority
-	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE, 
+	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
 			SOMATIC__EVENT__CODES__PROC_RUNNING, NULL, NULL);
 }
 
 /* ********************************************************************************************* */
 SimTab::~SimTab() {
-	
+
 	// Send the stopping event
 	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
 					 SOMATIC__EVENT__CODES__PROC_STOPPING, NULL, NULL);
-  
+
 	// Destroy the channel and daemon resources
 	somatic_d_channel_close(&daemon_cx, &imuChan);
-	somatic_d_channel_close(&daemon_cx, &waistChan);	 
-	somatic_d_channel_close(&daemon_cx, &leftArmChan); 
+	somatic_d_channel_close(&daemon_cx, &waistChan);
+	somatic_d_channel_close(&daemon_cx, &leftArmChan);
 	somatic_d_channel_close(&daemon_cx, &rightArmChan);
 	somatic_d_destroy(&daemon_cx);
 }
@@ -229,7 +229,7 @@ END_EVENT_TABLE()
 IMPLEMENT_DYNAMIC_CLASS(SimTab, GRIPTab)
 
 /* ********************************************************************************************* */
-// Necessary interface call to create a GRIP executable 
+// Necessary interface call to create a GRIP executable
 
 /// Application class
 extern wxNotebook* tabView;

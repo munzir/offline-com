@@ -14,7 +14,7 @@ endif()
 include(cmake/simulation.cmake)
 
 # Link to somatic, amino and ach
-# NOTE: Ideally we would like to 'find' these packages but for now, we assume they are either 
+# NOTE: Ideally we would like to 'find' these packages but for now, we assume they are either
 # in /usr/lib or /usr/local/lib
 link_libraries(protobuf-c amino ach kore somatic filter stdc++ ncurses blas lapack)
 
@@ -49,8 +49,8 @@ foreach(script_src_file ${scripts_source})
 	get_filename_component(script_base ${script_src_file} NAME_WE)
 	message(STATUS "Adding script ${script_src_file} with base name ${script_base}" )
 	add_executable(${script_base} ${script_src_file})
-	# target_link_libraries(${script_base} Main) 
-	target_link_libraries(${script_base} ${GRIP_LIBRARIES} ${DART_LIBRARIES} ${DARTExt_LIBRARIES} ${wxWidgets_LIBRARIES}) 
+	# target_link_libraries(${script_base} Main)
+	target_link_libraries(${script_base} ${GRIP_LIBRARIES} ${DART_LIBRARIES} ${DARTExt_LIBRARIES} ${wxWidgets_LIBRARIES})
 	add_custom_target(${script_base}.run ${script_base} ${ARGN})
 endforeach(script_src_file)
 message(STATUS " ")

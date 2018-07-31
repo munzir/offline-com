@@ -23,7 +23,7 @@ nohup jachd -j 0 -c spacenav-data-r -I jachd-spacenav2 >/dev/null &
 #### make vis channel b/c saul's code expects it:
 ach mk telop-05-workspce-vis -o 666 -1
 
-if [[ -n $DO_LIBERTY ]] 
+if [[ -n $DO_LIBERTY ]]
 then
     echo "pulling liberty channel from hubo-remote.local"
     ach mk liberty -o 666 -1
@@ -35,10 +35,10 @@ echo "Daemons started, press enter to clean up"
 read foo
 
 #### and kill our daemons
-sns -k jachd-spacenav 
+sns -k jachd-spacenav
 sns -k jachd-spacenav2
 
-if [[ -n $DO_LIBERTY ]] 
+if [[ -n $DO_LIBERTY ]]
 then
     echo "cleaning up hubo-remote.local"
     pgrep -f "achd pull -d -r -v hubo-remote.local liberty" | xargs -I pids kill -9 pids

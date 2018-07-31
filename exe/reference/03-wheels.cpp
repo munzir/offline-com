@@ -29,8 +29,8 @@
  * @file 03-wheels.cpp
  * @author Can Erdogan
  * @date July 11, 2013
- * @brief This demonstration simple moves the wheels back and forth, and spin to show how to use 
- * of the wheels. To do so, we will the joystick for input. 
+ * @brief This demonstration simple moves the wheels back and forth, and spin to show how to use
+ * of the wheels. To do so, we will the joystick for input.
  */
 
 #include <unistd.h>
@@ -68,12 +68,12 @@ void updateReference (double js_forw, double js_spin, double dt, Vector4d& refSt
 }
 
 /* ******************************************************************************************** */
-/// Returns the values of axes 1 (left up/down) and 2 (right left/right) in the joystick 
+/// Returns the values of axes 1 (left up/down) and 2 (right left/right) in the joystick
 bool getJoystickInput(double& js_forw, double& js_spin) {
 
 	// Get the message and check output is OK.
 	int r = 0;
-	Somatic__Joystick *js_msg = 
+	Somatic__Joystick *js_msg =
 			SOMATIC_GET_LAST_UNPACK( r, somatic__joystick, &protobuf_c_system_allocator, 4096, &js_chan );
 	if(!(ACH_OK == r || ACH_MISSED_FRAME == r) || (js_msg == NULL)) return false;
 
@@ -90,7 +90,7 @@ bool getJoystickInput(double& js_forw, double& js_spin) {
 void run() {
 
 	// Send a message; set the event code and the priority
-	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE, 
+	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
 			SOMATIC__EVENT__CODES__PROC_RUNNING, NULL, NULL);
 
 	// Initially the reference position and velocities are zero (don't move!)
@@ -106,8 +106,8 @@ void run() {
 		bool debug = (c_++ % 1 == 0);
 
 		// Get the current time and compute the time difference and update the prev. time
-		t_now = aa_tm_now();						
-		double dt = (double)aa_tm_timespec2sec(aa_tm_sub(t_now, t_prev));	
+		t_now = aa_tm_now();
+		double dt = (double)aa_tm_timespec2sec(aa_tm_sub(t_now, t_prev));
 		t_prev = t_now;
 
 		// Get the current state from the motor readings
@@ -124,9 +124,9 @@ void run() {
 		// Determine the reference values for x and psi
 		updateReference(js_forw, js_spin, dt, refState);
 		if(debug) cout << "refState:" << refState.transpose() << endl;
-		
+
 		// Compute the necessary current inputs to the wheels with the current and reference states
-		static const double Kp = 2.0, Kd = 12.0; 
+		static const double Kp = 2.0, Kd = 12.0;
 		double u [2];
 		u[0] = -Kp * (state(0) - refState(0)) -Kd * (state(2) - refState(2));
 		u[1] = -Kp * (state(1) - refState(1)) -Kd * (state(3) - refState(3));
@@ -148,7 +148,7 @@ void init() {
 
 	// Initialize the daemon
 	somatic_d_opts_t dopt;
-	memset(&dopt, 0, sizeof(dopt)); 
+	memset(&dopt, 0, sizeof(dopt));
 	dopt.ident = "03-wheels";
 	somatic_d_init(&daemon_cx, &dopt);
 
@@ -156,8 +156,8 @@ void init() {
 	somatic_motor_init(&daemon_cx, &amc, 2, "amc-cmd", "amc-state");
 
 	// Set the min and maximum position and velocity valid/limit values for motors
-	double ** limits[] = { 
-		&amc.pos_valid_min, &amc.vel_valid_min, &amc.pos_limit_min, &amc.vel_limit_min, 
+	double ** limits[] = {
+		&amc.pos_valid_min, &amc.vel_valid_min, &amc.pos_limit_min, &amc.vel_limit_min,
 		&amc.pos_valid_max,	&amc.vel_valid_max, &amc.pos_limit_max, &amc.vel_limit_max};
 	for(size_t i=0; i<4; i++)  { aa_fset(*limits[i],-1024.1, 2); }
 	for(size_t i=4; i<8; i++) { aa_fset(*limits[i],1024.1, 2); }
@@ -174,7 +174,7 @@ void init() {
 
 	// Initialize the joystick channel
 	int r = ach_open(&js_chan, "joystick-data", NULL);
-	aa_hard_assert(r == ACH_OK, "Ach failure '%s' on opening Joystick channel (%s, line %d)\n", 
+	aa_hard_assert(r == ACH_OK, "Ach failure '%s' on opening Joystick channel (%s, line %d)\n",
 		ach_result_to_string(static_cast<ach_status_t>(r)), __FILE__, __LINE__);
 }
 

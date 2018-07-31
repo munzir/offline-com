@@ -32,7 +32,7 @@ link_directories(${GRIP_LIBRARY_DIRS})
 link_directories(/usr/local/lib)
 link_directories(/usr/local/lib/assimp3)
 
-# Include OpenGL and GLUT 
+# Include OpenGL and GLUT
 Find_Package(OpenGL REQUIRED)
 Find_Package(GLUT REQUIRED)
 include_directories( ${GLUT_INCLUDE_DIRS} )

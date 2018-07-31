@@ -45,7 +45,7 @@ using namespace std;
 // Init somatic daemon
 somatic_d_t daemon_cx;
 
-// Init ACH channels  
+// Init ACH channels
 ach_channel_t js_chan;			/// the state channel for the joystick module
 ach_channel_t waistChan;		/// the state channel for the waist module
 ach_channel_t waistCmdChan;		/// the state channel for the waist module
@@ -268,11 +268,11 @@ void destroy() {
 }
 
 int main() {
-	
+
 	init();
 	run();
-	destroy(); 
-	
-	return 0; 
+	destroy();
+
+	return 0;
 }
 
