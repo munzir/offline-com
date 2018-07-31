@@ -2,7 +2,7 @@
  * @file ik-simTab.h
  * @author Can Erdogan
  * @date May 03, 2013
- * @brief Simulates the inverse kinematics behavior of the robot. When the arm is taken to a 
+ * @brief Simulates the inverse kinematics behavior of the robot. When the arm is taken to a
  * location and the location is saved, an inverse kinematics solution to the arm is found and
  * presented.
  */
@@ -36,7 +36,7 @@
 /// Timer to display the center of mass measurements and control the robot
 class Timer : public wxTimer {
 public:
-	void Notify ();								
+	void Notify ();
 };
 
 /* ********************************************************************************************* */
