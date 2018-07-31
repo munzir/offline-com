@@ -48,7 +48,7 @@ using namespace std;
 // Initialize somatic daemon object and joystick/krang ach channels, motor objects
 // See http://thebrain.golems.org/~humanoids/doc/somatic/structsomatic__d__t.html
 somatic_d_t daemon_cx;
-ach_channel_t js_chan;				
+ach_channel_t js_chan;
 ach_channel_t state_chan;
 ach_channel_t waistCmdChan;
 ach_channel_t waistChan;
@@ -67,12 +67,12 @@ void readJoystick() {
 
 	// Get the message and check output is OK.
 	int r = 0;
-	Somatic__Joystick *js_msg = 
+	Somatic__Joystick *js_msg =
 			SOMATIC_GET_LAST_UNPACK( r, somatic__joystick, &protobuf_c_system_allocator, 4096, &js_chan );
 	if(!(ACH_OK == r || ACH_MISSED_FRAME == r) || (js_msg == NULL)) return;
 
 	// Save values from joystick message buttons and save them to b
-	for(size_t i = 0; i < 10; i++) 
+	for(size_t i = 0; i < 10; i++)
 		b[i] = js_msg->buttons->data[i] ? 1 : 0;
 
 	// Copy over axes data
@@ -89,7 +89,7 @@ double presetArmConfs [][7] = {
   { -1.102,  0.589,  0.000,  1.339,  0.000,  1.400,  0.000},
   {  1.008,  -1.113,  -0.000,  -1.594,   0.037,   1.022,  -0.021}, // sitting grasp ready (left)
   {  -0.855,   1.113,   0.000,   1.561,  -0.028,  -1.052,   0.021}, // sitting grasp ready (right)
-  {  1.400, -1.000,  0.000, -0.800,  0.000, -0.800,  0.000}, 
+  {  1.400, -1.000,  0.000, -0.800,  0.000, -0.800,  0.000},
   { -1.400,  1.000,  0.000,  0.800,  0.000,  0.800,  0.000},
   {  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000},
   {  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000},
@@ -110,15 +110,15 @@ void controlArms () {
 		bool noConfs = true;
 		for(size_t i = 0; i < 4; i++) {
 			if(b[i] == 1) {
-				if((b[4] == 1) && (b[6] == 1)) 
+				if((b[4] == 1) && (b[6] == 1))
 					somatic_motor_cmd(&daemon_cx, &llwa, POSITION, presetArmConfs[2*i], 7, NULL);
-				if((b[5] == 1) && (b[7] == 1)) 
+				if((b[5] == 1) && (b[7] == 1))
 					somatic_motor_cmd(&daemon_cx, &rlwa, POSITION, presetArmConfs[2*i+1], 7, NULL);
-				noConfs = false; 
+				noConfs = false;
 				return;
 			}
 		}
-		
+
 		// If nothing is pressed, stop the arms
 		if(noConfs) {
 			double dq [] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -127,7 +127,7 @@ void controlArms () {
 			return;
 		}
 	}
-	
+
 	// Check the b for each arm and apply velocities accordingly
 	// For left: 4 or 6, for right: 5 or 7, lower arm button is smaller (4 or 5)
 	somatic_motor_t* arm [] = {&llwa, &rlwa};
@@ -143,7 +143,7 @@ void controlArms () {
 		if(b[lowerButton] && !b[higherButton]) memcpy(&dq[4], x, 3*sizeof(double));
 		else if(!b[lowerButton] && b[higherButton]) memcpy(dq, x, 4*sizeof(double));
 		else inputSet = false;
-		
+
 		// Set the input for this arm
 		if(inputSet) somatic_motor_cmd(&daemon_cx, arm[arm_idx], VELOCITY, dq, 7, NULL);
 	}
@@ -162,7 +162,7 @@ void controlWaist() {
 	// Send message to the krang-waist daemon
 	somatic_waist_cmd_set(waistDaemonCmd, waistMode);
 	int r = SOMATIC_PACK_SEND(&waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
-	if(ACH_OK != r) fprintf(stderr, "Couldn't send message: %s\n", 
+	if(ACH_OK != r) fprintf(stderr, "Couldn't send message: %s\n",
 		ach_result_to_string(static_cast<ach_status_t>(r)));
 
 	double w_val = getWaistState();
@@ -215,13 +215,13 @@ void controlRobotiq() {
 void run() {
 
 	// Send a message; set the event code and the priority
-	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE, 
+	somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
 			SOMATIC__EVENT__CODES__PROC_RUNNING, NULL, NULL);
 
 	// Unless an interrupt or terminate message is received, process the new message
 	while(!somatic_sig_received) {
 
-		// Read the joystick data 
+		// Read the joystick data
 		readJoystick();
 
 		// Control the arms if necessary
@@ -250,7 +250,7 @@ void run() {
 
 /* ********************************************************************************************* */
 void init () {
-	
+
 	// Initialize this daemon (program!)
 
 	// http://thebrain.golems.org/~humanoids/doc/somatic/structsomatic__d__opts__t.html
@@ -268,7 +268,7 @@ void init () {
 
 	// Initialize the joystick channel
 	int r = ach_open(&js_chan, "joystick-data", NULL);
-	aa_hard_assert(r == ACH_OK, "Ach failure '%s' on opening Joystick channel (%s, line %d)\n", 
+	aa_hard_assert(r == ACH_OK, "Ach failure '%s' on opening Joystick channel (%s, line %d)\n",
 		ach_result_to_string(static_cast<ach_status_t>(r)), __FILE__, __LINE__);
 
 	// Initialize the waist channel
