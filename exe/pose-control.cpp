@@ -95,6 +95,8 @@ double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double rlwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double torso_pos_target = 0.0;
 
+double get_current();
+
 vector<double> llwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 vector<double> rlwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double torso_pos_default = 0.0;
@@ -203,8 +205,21 @@ double getWaistState(){
 	int r;
 	Somatic__MotorState *waist = NULL;
 	while(waist == NULL) waist = getMotorMessage(waistChan);
-	double waist_val = (waist->position->data[0]);// - waist->position->data[1]) / 2.0;
+	double waist_val = (waist->position->data[0] - waist->position->data[1]) / 2.0;
 	return waist_val;
+}
+
+/* ********************************************************************************************* */
+/// update waist current value
+double getWaistCurr(){
+	struct timespec currTime;
+	clock_gettime(CLOCK_MONOTONIC, &currTime);	
+	struct timespec abstime = aa_tm_add(aa_tm_sec2timespec(1.0/30.0), currTime);
+	int r;
+	Somatic__MotorState *waist = NULL;
+	while(waist == NULL) waist = getMotorMessage(waistChan);
+	double waist_curr = (waist->current->data[0]);
+	return waist_curr;
 }
 
 /* ********************************************************************************************* */
@@ -261,6 +276,11 @@ void recordData() {
 	double imu_val = getIMUState();
 	cout << "imu pose: " << imu_val << endl;
 	out_file << imu_val << endl;
+	
+	double w_curr = getWaistCurr();
+	cout << "waist current: " << w_curr << endl;
+	out_file << w_curr << ", ";
+	//out_file << "waist current: " << get_current() << endl;
 }
 
 /* ********************************************************************************************* */

@@ -30,6 +30,7 @@ include_directories(EIGEN3_INCLUDE_DIR)
 # Include the project files and the common helpers for all the experiments
 include_directories(src)
 include_directories(../common)
+#include_directories(/home/cerdogan/Documents/Software/drivers/krang-waist)
 
 # Collect the source, script and fortran files
 #file(GLOB main_source "src/*.cpp" "src/*.c")
