@@ -122,8 +122,8 @@ vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
 vector<double> presetTorsoConfs;
 
-ifstream in_file("../data/poses.txt");
-ofstream out_file("../data/out.txt", ios::app);
+ifstream in_file("../data/poseTrajectoriesrfinalSet/interposeTraj1-2.txt");
+ofstream out_file("../data/interposeTraj1-2out.txt", ios::app);
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -203,7 +203,7 @@ double getWaistState(){
 	int r;
 	Somatic__MotorState *waist = NULL;
 	while(waist == NULL) waist = getMotorMessage(waistChan);
-	double waist_val = (waist->position->data[0] - waist->position->data[1]) / 2.0;
+	double waist_val = (waist->position->data[0]);// - waist->position->data[1]) / 2.0;
 	return waist_val;
 }
 
