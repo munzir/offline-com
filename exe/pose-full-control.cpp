@@ -168,7 +168,8 @@ void readPoseFile() {
                 istringstream convert(strNum);
                 convert >> doubNum;
                 cout << doubNum;
-                // TODO change indexes to reflect munzir format
+                // TODO change indexes to reflect munzir format (eventually not
+                // yet)
                 if (i == 9) {
                     presetTorsoConfs.push_back(doubNum);
                 }
@@ -380,6 +381,8 @@ void init_pos_target() {
 // Stop All Movements
 void haltMovement() {
     cout << "halting movements" << endl;
+
+    // TODO
     //// Halt Waist
     //static Somatic__WaistCmd *waistDaemonCmd = somatic_waist_cmd_alloc();
     //somatic_waist_cmd_set(waistDaemonCmd, SOMATIC__WAIST_MODE__STOP);
@@ -680,28 +683,26 @@ void controlTorsoAndArms() {
             // the direction is difference
             // TODO update the if statement potentially and determine if all
             // (next three if statements) motors should go inside one if statement
-            if (torso_reached || (((b[0] == 1) && (torso_dir == -1)) || ((b[2] == 1) && (torso_dir == 1)))) {
+            //if (torso_reached || (((b[0] == 1) && (torso_dir == -1)) || ((b[2] == 1) && (torso_dir == 1)))) {
+            //if (llwa_reached || (((b[0] == 1) && (llwa_dir == -1 )) || (( b[2] == 1) && (llwa_dir == 1)))) {
+            //if (rlwa_reached || (((b[0] == 1) && (rlwa_dir == -1)) || ((b[2] == 1) && (rlwa_dir == 1)))) {
+            if ((torso_reached && llwa_reached && rlwa_reached) || (((b[0] == 1) && ((torso_dir == 1) && (llwa_dir == 1) && (rlwa_dir == 1))) || ((b[2] == 1) && ((torso_dir == 1) && (llwa_dir == 1) && (rlwa_dir == 1))))) {
                 // if reached previous location, decrease/increase target by
                 // step
                 if (b[0] == 1) {
                     torso_dir = 1;
+                    llwa_dir = 1;
+                    rlwa_dir = 1;
                 } else {
                     torso_dir = -1;
+                    llwa_dir = -1;
+                    rlwa_dir = -1;
                 }
                 torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
                 torso_pos_target = presetTorsoConfs[torso_config_idx];
                 cout << "new torso target: " << torso_pos_target << endl;
                 torso_reached = false;
-            }
 
-            if (llwa_reached || (((b[0] == 1) && (llwa_dir == -1 )) || (( b[2] == 1) && (llwa_dir == 1)))) {
-                // if reached previous location, decrease/increase target by
-                // step
-                if (b[0] == 1) {
-                    llwa_dir = 1;
-                } else {
-                    llwa_dir = -1;
-                }
                 cout << "left arm config id: " << llwa_config_idx;
                 cout << "size of preset config: " << presetArmConfsL.size();
                 llwa_config_idx = (llwa_config_idx + llwa_dir) % presetArmConfsL.size();
@@ -709,16 +710,7 @@ void controlTorsoAndArms() {
                 updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
                 printArmPos(llwa_pos_target, "left");
                 llwa_reached = false;
-            }
 
-            if (rlwa_reached || (((b[0] == 1) && (rlwa_dir == -1)) || ((b[2] == 1) && (rlwa_dir == 1)))) {
-                // if reached previous location, decrease/increase target by
-                // step
-                if (b[0] == 1) {
-                    rlwa_dir = 1;
-                } else {
-                    rlwa_dir = -1;
-                }
                 cout << "right arm config id: " << rlwa_config_idx;
                 cout << "size of preset config: " << (presetArmConfsR.size());
                 rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % presetArmConfsR.size();
@@ -779,38 +771,66 @@ void applyMove() {
         hlt_mv = false;
     }
 
-    if (torso_reset) {
+    // For full body movements
+    if (torso_reset && llwa_reset & rlwa_reset) {
+        cout << "resetting torso" << endl;
         somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 1, NULL);
         torso_reset = false;
-    }
 
-    if (llwa_reset) {
         cout << "resetting left arm" << endl;
         somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
         llwa_reset = false;
-    }
 
-    if (torso_reset) {
+        cout << "resetting right arm" << endl;
         somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
         rlwa_reset = false;
     }
 
     usleep(1e5);
 
-    if (torso_mv) {
+    if (torso_mv && llwa_mv && rlwa_mv) {
         double torso_pos_array[1] = {torso_pos_target};
         somatic_motor_cmd(&daemon_cx, &torso, POSITION, torso_pos_array, 1, NULL);
-    }
-
-    if (llwa_mv) {
         somatic_motor_update(&daemon_cx, &llwa);
         moveArm(llwa, llwa_pos_target);
-    }
-
-    if (rlwa_mv) {
         somatic_motor_update(&daemon_cx, &rlwa);
         moveArm(rlwa, rlwa_pos_target);
     }
+
+    // For segmented movements
+    //if (torso_reset) {
+    //    somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 1, NULL);
+    //    torso_reset = false;
+    //}
+
+    //if (llwa_reset) {
+    //    cout << "resetting left arm" << endl;
+    //    somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
+    //    llwa_reset = false;
+    //}
+
+    //if (rlwa_reset) {
+    //    cout << "resetting right arm" << endl;
+    //    somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
+    //    rlwa_reset = false;
+    //}
+
+    //usleep(1e5);
+
+    //if (torso_mv) {
+    //    double torso_pos_array[1] = {torso_pos_target};
+    //    somatic_motor_cmd(&daemon_cx, &torso, POSITION, torso_pos_array, 1, NULL);
+    //}
+
+    //if (llwa_mv) {
+    //    somatic_motor_update(&daemon_cx, &llwa);
+    //    moveArm(llwa, llwa_pos_target);
+    //}
+
+    //if (rlwa_mv) {
+    //    somatic_motor_update(&daemon_cx, &rlwa);
+    //    moveArm(rlwa, rlwa_pos_target);
+    //}
 }
 
 /******************************************************************************/
@@ -833,26 +853,50 @@ void poseUpdate() {
     somatic_motor_update(&daemon_cx, &llwa);
     somatic_motor_update(&daemon_cx, &rlwa);
 
-    // check torso configuration
-    if ((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) {
+    // TODO is it fine to combine the below three if statements into one like
+    // below
+    // check full body configuration
+    if (((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) && (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) && (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached)) {
+    //if ((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) {
+    //if (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) {
+    //if (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached) {
         cout << "torso target reached" << endl;
         double dq[] = {0.0};
         somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
         somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
         torso_reached = true;
-    }
 
-    // check left arm configuration
-    if (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) {
+        // left arm
         cout << "left arm target reached" << endl;
         llwa_reached = true;
-    }
 
-    // check right arm configuration
-    if (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached) {
+        // right arm
         cout << "right arm target reached" << endl;
         rlwa_reached = true;
     }
+
+
+    // Below checks for segemented body individually
+    // check torso configuration
+    //if ((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) {
+    //    cout << "torso target reached" << endl;
+    //    double dq[] = {0.0};
+    //    somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
+    //    somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
+    //    torso_reached = true;
+    //}
+
+    //// check left arm configuration
+    //if (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) {
+    //    cout << "left arm target reached" << endl;
+    //    llwa_reached = true;
+    //}
+
+    //// check right arm configuration
+    //if (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached) {
+    //    cout << "right arm target reached" << endl;
+    //    rlwa_reached = true;
+    //}
 }
 
 /******************************************************************************/
