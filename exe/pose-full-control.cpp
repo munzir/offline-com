@@ -113,6 +113,7 @@ int torso_config_idx = 0;
 vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
 vector<double> presetTorsoConfs;
+vector<double> presetWaistConfs;
 
 // INPUT on below line (input and output file names)
 ifstream pose_in_file("../data/dataIn/poseTrajectoriesrfinalSet/interposeTraj1-2.txt");
@@ -152,6 +153,7 @@ void readPoseFile() {
     presetArmConfsL.push_back(llwa_pos_default);
     presetArmConfsR.push_back(rlwa_pos_default);
     presetTorsoConfs.push_back(torso_pos_default);
+    presetWaistConfs.push_back(waist_pos_default);
     while (getline(pose_in_file, line)) {
         cout << "new line: " << line << endl;
         stringstream lineStream(line);
@@ -168,6 +170,8 @@ void readPoseFile() {
                 cout << doubNum;
                 // TODO change indexes to reflect munzir format (eventually not
                 // yet)
+                if (i == 8) {
+                    presetWaistConfs.push_back(doubNum);
                 if (i == 9) {
                     presetTorsoConfs.push_back(doubNum);
                 }
@@ -188,6 +192,11 @@ void readPoseFile() {
     cout << "read over" << endl;
     cout << "total configurations read: " << count << endl;
     pose_in_file.close();
+
+    cout << "waist configurations" << endl;
+    for (auto c : presetWaistConfs) {
+        cout << c << endl;
+    }
 
     cout << "torso configurations" << endl;
     for (auto c : presetTorsoConfs) {
@@ -678,6 +687,9 @@ void controlTorsoAndArms() {
                     llwa_dir = -1;
                     rlwa_dir = -1;
                 }
+
+
+
                 torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
                 torso_pos_target = presetTorsoConfs[torso_config_idx];
                 cout << "new torso target: " << torso_pos_target << endl;
