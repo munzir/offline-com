@@ -34,12 +34,13 @@
  */
 
 // // Includes
-#include "initModules.h"
-#include "motion.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <sstream>
+
+#include "initModules.h"
+#include "motion.h"
 
 // // Namespaces
 using namespace std;
@@ -52,8 +53,8 @@ using namespace std;
 
 // tolerance for the pose
 // TODO Test lower tolerance value
-#define POSE_TOL= 0.01
-//#define POSE_TOL= 0.005
+#define POSE_TOL 0.01
+//#define POSE_TOL 0.005
 
 // // Global Stuff
 // Init somatic daemon
@@ -99,7 +100,7 @@ bool rlwa_reset = false;
 bool torso_reset = false;
 
 double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+double rlwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double torso_pos_target = 0.0;
 
 vector<double> llwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -116,20 +117,44 @@ vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
 vector<double> presetTorsoConfs;
 
-ifstream poses_in_file("../data/poses.txt");
-ofstream pose_out_file("../data/out.txt", ios::app);
+ifstream pose_in_file("../data/inputPoses.txt");
+ofstream pose_out_file("../data/outputPoses.txt", ios::app);
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/******************************************************************************/
+// Update qBase (imu) state value
+double getIMUState() {
+    struct timespec currTime;
+    clock_gettime(CLOCK_MONOTONIC, &currTime);
+    struct timespec abstime = aa_tm_add(aa_tm_sec2timespec(1.0/30.0), currTime);
+    int r;
+    double imu, imuSpeed;
+    Somatic__Vector *imu_msg = SOMATIC_WAIT_LAST_UNPACK(r, somatic__vector,
+            &protobuf_c_system_allocator, IMU_CHANNEL_SIZE, &imuChan, &abstime);
+    assert((imu_msg != NULL) && "Imu message is faulty!");
+
+    // Get the imu position and velocity value from the readings (note imu
+    // mounted at 45 deg).
+    static const double mountAngle = -0.7853981634;
+    double newX = imu_msg->data[0] * cos(mountAngle) - imu_msg->data[1] * sin(mountAngle);
+    double _imu = atan2(newX, imu_msg->data[2]);
+
+    // Free the unpacked message
+    somatic__vector__free_unpacked(imu_msg, &protobuf_c_system_allocator);
+
+    return _imu;
+}
 
 /******************************************************************************/
 // Read and write poses to file
 void readPoseFile() {
     int count = 0;
     string line;
-    presetArmConfsL.push_back(llwa_pose_default);
+    presetArmConfsL.push_back(llwa_pos_default);
     presetArmConfsR.push_back(rlwa_pos_default);
     presetTorsoConfs.push_back(torso_pos_default);
-    while (getline(poses_in_file, line)) {
+    while (getline(pose_in_file, line)) {
         cout << "new line: " << line << endl;
         stringstream lineStream(line);
         string strNum;
@@ -252,7 +277,7 @@ void *kbhit(void *) {
             recordPoseData();
         }
         if (input == 'x') {
-            outfile << "DELETE PREVIOUS LINE" << endl;
+            pose_out_file << "DELETE PREVIOUS LINE" << endl;
         }
         pthread_mutex_unlock(&mutex);
     }
@@ -288,7 +313,6 @@ void init() {
     // Initialize daemon with options
     somatic_d_opts_t dopt;
     memset(&dopt, 0, sizeof(dopt)); // zero intialize
-    // TODO identifier needs to changed when finalized
     dopt.ident = "pose-full-ctrl";
     somatic_d_init(&daemon_cx, &dopt);
 
@@ -581,7 +605,7 @@ void controlTorso() {
                     torso_dir = -1;
                 }
                 torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
-                torso_pos_target = resetTorsoConfs[torso_config_idx];
+                torso_pos_target = presetTorsoConfs[torso_config_idx];
                 cout << "new torso target: " << torso_pos_target << endl;
                 torso_reached = false;
             }
@@ -665,7 +689,7 @@ void controlTorsoAndArms() {
                     torso_dir = -1;
                 }
                 torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
-                torso_pos_target = resetTorsoConfs[torso_config_idx];
+                torso_pos_target = presetTorsoConfs[torso_config_idx];
                 cout << "new torso target: " << torso_pos_target << endl;
                 torso_reached = false;
             }
@@ -715,8 +739,9 @@ void processJS() {
     // TODO create a method that controls torso and arm
     controlTorsoAndArms();
 
-    controlTorso();
-    controlArms();
+    // TODO decommission these once we know controlTorsoAndArms work
+    //controlTorso();
+    //controlArms();
 
     // if no buttons are actively pressed we halt all movements
     if (buttonPressed()) {
@@ -791,9 +816,9 @@ void applyMove() {
 /******************************************************************************/
 // Check the 7 motors (indexed 0 to 6) of the arm position and match with pose
 // target
-bool checkArm(double pos[7], double target[7], double del) {
+bool checkArm(double pos[7], double target[7], double tol) {
     for (int i = 0; i < 7; ++i) {
-        if (fabs(pos[i] - target[i]) >= del) {
+        if (fabs(pos[i] - target[i]) > tol) {
             return false;
         }
     }
@@ -809,20 +834,21 @@ void poseUpdate() {
     somatic_motor_update(&daemon_cx, &rlwa);
 
     // check torso configuration
-    if ((fabs(torso.pos[0] - torso_pos_target) < POSE_TOL) && !torso_reached) {
+    if ((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) {
         cout << "torso target reached" << endl;
         double dq[] = {0.0};
-        somatic_motor_cmd(&deamon_cx, &torso, VELOCITY, dq, 1, NULL);
+        somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
         somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
         torso_reached = true;
     }
 
-    // check arm configuration
+    // check left arm configuration
     if (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) {
-        cout << "left armr target reached" << endl;
+        cout << "left arm target reached" << endl;
         llwa_reached = true;
     }
 
+    // check right arm configuration
     if (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached) {
         cout << "right arm target reached" << endl;
         rlwa_reached = true;
@@ -855,7 +881,7 @@ void run() {
     }
 
     // Send the stopping even
-    somatic_d_even(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
+    somatic_d_event(&daemon_cx, SOMATIC__EVENT__PRIORITIES__NOTICE,
             SOMATIC__EVENT__CODES__PROC_STOPPING, NULL, NULL);
 
     // close our write file
@@ -874,7 +900,7 @@ void destroy() {
     somatic_metadata_set_time_now(waistDaemonCmd->meta);
     somatic_metadata_set_until_duration(waistDaemonCmd->meta, 0.1);
 
-    ach_status_t r = SOMATIC_PACK_SEND(&waistCmdCChan, somatic__waist_cmd, waistDaemonCmd);
+    ach_status_t r = SOMATIC_PACK_SEND(&waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
     if (ACH_OK != r) fprintf(stderr, "Couldn't send message: %s\n", ach_result_to_string(r));
     somatic_d_channel_close(&daemon_cx, &waistChan);
     somatic_d_channel_close(&daemon_cx, &waistCmdChan);

@@ -35,7 +35,10 @@ include_directories(../common)
 # Collect the source, script and fortran files
 #file(GLOB main_source "src/*.cpp" "src/*.c")
 #file(GLOB scripts_source "exe/*.cpp")
+
 file(GLOB scripts_source "exe/pose-control.cpp")
+#file(GLOB scripts_source "exe/pose-full-control.cpp")
+
 LIST(SORT scripts_source)
 
 # Build the library and set the executables that use it (have to hardcode for now)

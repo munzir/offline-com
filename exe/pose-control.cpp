@@ -95,7 +95,9 @@ double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double rlwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double torso_pos_target = 0.0;
 
-double get_current();
+//ifstream myfile ("/home/munzir/areeb/waist_log.txt", ios::in);
+string inputline;
+//double get_current();
 
 vector<double> llwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 vector<double> rlwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -280,6 +282,16 @@ void recordData() {
 	double w_curr = getWaistCurr();
 	cout << "waist current: " << w_curr << endl;
 	out_file << w_curr << ", ";
+	//string line;
+	ifstream myfile ("/home/munzir/areeb/waist_log.txt", ios::in);
+	if(myfile.is_open()){
+		getline(myfile, inputline);
+//		getline(myfile, inputline);
+		cout << inputline << endl;
+	}
+	else{
+		cout << "WAIST LOG FILE NOT OPEN" << endl;
+	}
 	//out_file << "waist current: " << get_current() << endl;
 }
 
