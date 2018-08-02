@@ -88,8 +88,6 @@ bool llwa_reached = true;
 bool rlwa_reached = true;
 bool torso_reached = true;
 
-// TODO I believe below comment is incorrect
-// 0 for initial value, 1 for clockwise, 2 for counter clockwise
 // -1 for backwards direction and 1 for positive direction in pose file
 int llwa_dir = 0;
 int rlwa_dir = 0;
@@ -107,7 +105,6 @@ vector<double> llwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 vector<double> rlwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double torso_pos_default = 0.0;
 
-// TODO what does this mean
 // Index of the current pose in the read file
 int llwa_config_idx = 0;
 int rlwa_config_idx = 0;
@@ -117,8 +114,9 @@ vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
 vector<double> presetTorsoConfs;
 
-ifstream pose_in_file("../data/inputPoses.txt");
-ofstream pose_out_file("../data/outputPoses.txt", ios::app);
+// INPUT on below line (input and output file names)
+ifstream pose_in_file("../data/dataIn/poseTrajectoriesrfinalSet/interposeTraj1-2.txt");
+ofstream pose_out_file("../data/dataOut/interposeTraj1-2out.txt", ios::app);
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -162,7 +160,7 @@ void readPoseFile() {
         vector<double> poseL;
         vector<double> poseR;
         int i = 0;
-        cout << "read number: ";
+        cout << "read number";
         while (getline(lineStream, strNum, ' ')) {
             if (!strNum.empty()) {
                 istringstream convert(strNum);
@@ -187,9 +185,14 @@ void readPoseFile() {
         presetArmConfsR.push_back(poseR);
         ++count;
     }
-    cout << "read over: " << endl;
+    cout << "read over" << endl;
     cout << "total configurations read: " << count << endl;
     pose_in_file.close();
+
+    cout << "torso configurations" << endl;
+    for (auto c : presetTorsoConfs) {
+        cout << c << endl;
+    }
 
     cout << "left arm configurations: " << endl;
     for (auto c : presetArmConfsL) {
@@ -205,11 +208,6 @@ void readPoseFile() {
             cout << d << ", ";
         }
         cout << endl;
-    }
-
-    cout << "torso configurations" << endl;
-    for (auto c : presetTorsoConfs) {
-        cout << c << endl;
     }
 }
 
@@ -447,7 +445,6 @@ void printArmPos(double pos[], string dir) {
 }
 
 /******************************************************************************/
-// TODO
 // Handles Arm Configurations
 void controlArms() {
 
@@ -476,8 +473,6 @@ void controlArms() {
         return;
     }
 
-    // TODO I believe below line is incorrect description
-    // buttons 1 and 3 are for clockwise/counterclockwise position change
     // buttons 5 & 1 and 5 & 3 are for forward/backward position movements
     if (((b[6] == 1) && (b[0] == 1)) || ((b[6] == 1) && (b[2] == 1))) {
         if (!llwa_mv && input_end) {
@@ -532,8 +527,6 @@ void controlArms() {
         return;
     }
 
-    // TODO I believe below line is incorrect description
-    // buttons 1 and 3 are for clockwise/counterclockwise position change
     // buttons 6 & 1 and 6 & 3 are for forward/backward position movements
     if (((b[7] == 1) && (b[0] == 1)) || ((b[7] == 1) && (b[2] == 1))) {
         if (!rlwa_mv && input_end) {
@@ -618,21 +611,18 @@ void controlTorso() {
 }
 
 /******************************************************************************/
-// TODO test this code
 // Handles Torso and Arms
 void controlTorsoAndArms() {
 
-    // axis LS down & button 5 & 6 & 4 for reset current target
-    if ((x[1] > 0.9) && (b[4] == 1) && (b[5] == 1) && (b[3] == 1)) {
+    // button 5 & 7 & 8 & 4 for reset current target
+    if ((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[3] == 1)) {
         resetTorsoTarget();
         resetLlwaTarget();
         resetRlwaTarget();
     }
 
-    // axis LS down & button 5 & 6 & 2 for reset to default position
-    if ((x[1] > 0.9) && (b[4] == 1) && (b[5] == 1) && (b[1] == 1)) {
-        // TODO should these be ors or ands basically can the torso and arms be
-        // separately flagged (||) or need to be flagged together (&&)
+    // button 5 & 7 & 8 & 2 for reset to default position
+    if ((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[1] == 1)) {
         if (!torso_mv && !llwa_mv && !rlwa_mv && input_end) {
             // if not moving currently, update reset and move flags
             torso_reset = true;
@@ -663,14 +653,9 @@ void controlTorsoAndArms() {
         return;
     }
 
-    // axis LS down & button 5 & 6 & 1 and axis LS down & button 5 & 6 & 3 are for forward/backward position movements
-    if (((x[1] > 0.9) && (b[4] == 1) && (b[5] == 1) && (b[0] == 1)) || ((x[1] > 0.9) && (b[4] == 1) && (b[5] == 1) && (b[2] == 1))) {
-        // TODO should these be ors or ands basically can the torso and arms be
-        // separately flagged (||) or need to be flagged together (&&)
+    // button 5 & 7 & 8 & 3 and button 5 & 7 & 8 & 1 are for forward/backward position movements
+    if (((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[2] == 1)) || ((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[0] == 1))) {
         if (!torso_mv && !llwa_mv && !rlwa_mv && input_end) {
-            // TODO why the below two couts
-            cout << "new left arm config" << endl;
-            cout << "new right arm config" << endl;
             // if not moving currently, update reset and move flags
             torso_reset = true;
             torso_mv = true;
@@ -681,15 +666,10 @@ void controlTorsoAndArms() {
 
             // we only update our target if we have reach our previous target or
             // the direction is difference
-            // TODO update the if statement potentially and determine if all
-            // (next three if statements) motors should go inside one if statement
-            //if (torso_reached || (((b[0] == 1) && (torso_dir == -1)) || ((b[2] == 1) && (torso_dir == 1)))) {
-            //if (llwa_reached || (((b[0] == 1) && (llwa_dir == -1 )) || (( b[2] == 1) && (llwa_dir == 1)))) {
-            //if (rlwa_reached || (((b[0] == 1) && (rlwa_dir == -1)) || ((b[2] == 1) && (rlwa_dir == 1)))) {
-            if ((torso_reached && llwa_reached && rlwa_reached) || (((b[0] == 1) && ((torso_dir == 1) && (llwa_dir == 1) && (rlwa_dir == 1))) || ((b[2] == 1) && ((torso_dir == 1) && (llwa_dir == 1) && (rlwa_dir == 1))))) {
+            if ((torso_reached && llwa_reached && rlwa_reached) || (((b[2] == 1) && ((torso_dir == -1) && (llwa_dir == -1) && (rlwa_dir == -1))) || ((b[0] == 1) && ((torso_dir == 1) && (llwa_dir == 1) && (rlwa_dir == 1))))) {
                 // if reached previous location, decrease/increase target by
                 // step
-                if (b[0] == 1) {
+                if (b[2] == 1) {
                     torso_dir = 1;
                     llwa_dir = 1;
                     rlwa_dir = 1;
@@ -703,21 +683,23 @@ void controlTorsoAndArms() {
                 cout << "new torso target: " << torso_pos_target << endl;
                 torso_reached = false;
 
-                cout << "left arm config id: " << llwa_config_idx;
-                cout << "size of preset config: " << presetArmConfsL.size();
+                //cout << "left arm config id: " << llwa_config_idx;
+                //cout << "size of preset config: " << presetArmConfsL.size();
                 llwa_config_idx = (llwa_config_idx + llwa_dir) % presetArmConfsL.size();
-                cout << "left arm config id: " << llwa_config_idx;
+                //cout << "left arm config id: " << llwa_config_idx;
                 updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
                 printArmPos(llwa_pos_target, "left");
                 llwa_reached = false;
 
-                cout << "right arm config id: " << rlwa_config_idx;
-                cout << "size of preset config: " << (presetArmConfsR.size());
+                //cout << "right arm config id: " << rlwa_config_idx;
+                //cout << "size of preset config: " << (presetArmConfsR.size());
                 rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % presetArmConfsR.size();
-                cout << "right arm config id: " << rlwa_config_idx;
+                //cout << "right arm config id: " << rlwa_config_idx;
                 updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
                 printArmPos(rlwa_pos_target, "right");
+
                 rlwa_reached = false;
+				cout << "Config IDs: T-" << torso_config_idx << " L-" << llwa_config_idx << " R-" << rlwa_config_idx << endl;
             }
         }
         return;
@@ -728,12 +710,7 @@ void controlTorsoAndArms() {
 // Handles Joystick Commands
 void processJS() {
 
-    // TODO create a method that controls torso and arm
     controlTorsoAndArms();
-
-    // TODO decommission these once we know controlTorsoAndArms work
-    //controlTorso();
-    //controlArms();
 
     // if no buttons are actively pressed we halt all movements
     if (buttonPressed()) {
@@ -772,16 +749,18 @@ void applyMove() {
     }
 
     // For full body movements
-    if (torso_reset && llwa_reset & rlwa_reset) {
-        cout << "resetting torso" << endl;
+    if (torso_reset && llwa_reset && rlwa_reset) {
+
+        //cout << "resetting torso" << endl;
+        //cout << "resetting left arm" << endl;
+        //cout << "resetting right arm" << endl;
+
         somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 1, NULL);
         torso_reset = false;
 
-        cout << "resetting left arm" << endl;
         somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
         llwa_reset = false;
 
-        cout << "resetting right arm" << endl;
         somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
         rlwa_reset = false;
     }
@@ -853,26 +832,26 @@ void poseUpdate() {
     somatic_motor_update(&daemon_cx, &llwa);
     somatic_motor_update(&daemon_cx, &rlwa);
 
-    // TODO is it fine to combine the below three if statements into one like
-    // below
     // check full body configuration
     if (((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) && (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) && (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached)) {
-    //if ((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) {
-    //if (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) {
-    //if (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached) {
-        cout << "torso target reached" << endl;
         double dq[] = {0.0};
         somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
         somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
         torso_reached = true;
 
         // left arm
-        cout << "left arm target reached" << endl;
         llwa_reached = true;
 
         // right arm
-        cout << "right arm target reached" << endl;
         rlwa_reached = true;
+
+        //cout << "torso target reached" << endl;
+        //cout << "left arm target reached" << endl;
+        //cout << "right arm target reached" << endl;
+
+        cout << "********************************" << endl;
+		cout << "******** TARGET REACHED ********" << endl;
+        cout << "********************************" << endl;
     }
 
 

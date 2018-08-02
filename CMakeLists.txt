@@ -36,8 +36,8 @@ include_directories(../common)
 #file(GLOB main_source "src/*.cpp" "src/*.c")
 #file(GLOB scripts_source "exe/*.cpp")
 
-file(GLOB scripts_source "exe/pose-control.cpp")
-#file(GLOB scripts_source "exe/pose-full-control.cpp")
+#file(GLOB scripts_source "exe/pose-control.cpp")
+file(GLOB scripts_source "exe/pose-full-control.cpp")
 
 LIST(SORT scripts_source)
 
