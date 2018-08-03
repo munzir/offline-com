@@ -25,7 +25,7 @@
  *
  */
 
-/*
+/**
  * @file pose-full-control.cpp
  * @author Shimin Zhang
  * @modifier Akash Patel
@@ -80,30 +80,26 @@ bool input_end = true;
 bool hlt_mv = false;
 
 bool pose_mv = false;
-bool all_joints_mv = false;
-//bool llwa_mv = false;
-//bool rlwa_mv = false;
-//bool torso_mv = false;
-//bool waist_mv = false;
+bool llwa_mv = false;
+bool rlwa_mv = false;
+bool torso_mv = false;
+bool waist_mv = false;
 
-bool all_joints_reached = true;
-//bool llwa_reached = true;
-//bool rlwa_reached = true;
-//bool torso_reached = true;
-//bool waist_reached = true;
+bool llwa_reached = true;
+bool rlwa_reached = true;
+bool torso_reached = true;
+bool waist_reached = true;
 
 // -1 for backwards direction and 1 for positive direction in pose file
-int all_joints_dir = 0;
-//int llwa_dir = 0;
-//int rlwa_dir = 0;
-//int torso_dir = 0;
-//int waist_dir = 0;
+int llwa_dir = 0;
+int rlwa_dir = 0;
+int torso_dir = 0;
+int waist_dir = 0;
 
-bool all_joints_reset = false;
-//bool llwa_reset = false;
-//bool rlwa_reset = false;
-//bool torso_reset = false;
-//bool waist_reset = false;
+bool llwa_reset = false;
+bool rlwa_reset = false;
+bool torso_reset = false;
+bool waist_reset = false;
 
 double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 double rlwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -122,11 +118,10 @@ double torso_pos_default = 0.0;
 double waist_pos_default = 0.0;
 
 // Index of the current pose in the read file
-int all_joints_config_idx = 0;
-//int llwa_config_idx = 0;
-//int rlwa_config_idx = 0;
-//int torso_config_idx = 0;
-//int waist_config_idx = 0;
+int llwa_config_idx = 0;
+int rlwa_config_idx = 0;
+int torso_config_idx = 0;
+int waist_config_idx = 0;
 
 vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
@@ -336,10 +331,11 @@ void readJoystick() {
 }
 
 /******************************************************************************/
-// Initialize imu, waist command/state channels
+// Initialize imu, waist command/state channesl
 // and torso and arms with somatic motors
 // and joystick channels
 void init() {
+
     // Initialize daemon with options
     somatic_d_opts_t dopt;
     memset(&dopt, 0, sizeof(dopt)); // zero intialize
@@ -373,13 +369,6 @@ void init() {
 }
 
 /******************************************************************************/
-// TODO: Need to implement after waist control works
-// Set Waist Target
-void resetWaistTarget() {
-    // hmmm
-}
-
-/******************************************************************************/
 // Set Torso Target
 void resetTorsoTarget() {
     somatic_motor_update(&daemon_cx, &torso);
@@ -403,21 +392,14 @@ void resetRlwaTarget() {
 }
 
 /******************************************************************************/
-// Set All Joints Target
-void resetAllJointsTarget() {
-    resetWaistTarget();
-    resetTorsoTarget();
-    resetLlwaTarget();
-    resetRlwaTarget();
-}
-
-/******************************************************************************/
 // Set initial postion targets for toros and arms to existing positions
 void init_pos_target() {
     somatic_motor_update(&daemon_cx, &llwa);
     somatic_motor_update(&daemon_cx, &rlwa);
 
-    resetAllJointsTarget();
+    resetTorsoTarget();
+    resetLlwaTarget();
+    resetRlwaTarget();
 }
 
 /******************************************************************************/
@@ -454,16 +436,19 @@ bool buttonPressed() {
     // buttons 1 or 2 or 3 or 4
     bool command_btn = ((b[0] == 1) || (b[1] == 1) || (b[2] == 1) || (b[3] == 1));
 
+    // For full control
     // buttons 5 & 7 & 8
     bool part_btn = ((b[4] == 1) && (b[6] == 1) && (b[7] == 1));
 
-    // TODO: come back after waist control implemented
-    // valid waist command
-    //if (((x[5] < -0.9) || (x[5] > 0.9)) && command_btn) {
-    //    return true;
-    //}
+    // For individual control
+    //bool part_btn = ((b[4] == 1) || (b[5] == 1) || (b[6] == 1) || (b[7] == 1) || (x[1] > 0.9));
 
-    // all joints configs
+    // valid waist command
+    if (((x[5] < -0.9) || (x[5] > 0.9)) && command_btn) {
+        return true;
+    }
+
+    // arm, shoulder, & torso configs
     if (part_btn && command_btn) {
         return true;
     }
@@ -493,28 +478,195 @@ void printArmPos(double pos[], string dir) {
 }
 
 /******************************************************************************/
+// Handles Arm Configurations
+void controlArms() {
+
+    // Left Arm
+
+    // button 5 & 4 for reset current target
+    if ((b[6] == 1) && (b[3] == 1)) {
+        resetLlwaTarget();
+    }
+
+    //button 5 & 2 for reset to default position
+    if ((b[6] == 1) && (b[1] == 1)) {
+        if (!llwa_mv && input_end) {
+            // if not moving currently, update reset and move flags
+            llwa_reset = true;
+            llwa_mv = true;
+            // update target
+            updateArmTarget(llwa_pos_target, llwa_pos_default);
+            printArmPos(llwa_pos_target, "left");
+            // if we reached the previous destination, reset reached flag
+            if (llwa_reached) {
+                llwa_reached = false;
+                llwa_dir = 0;
+            }
+        }
+        return;
+    }
+
+    // buttons 5 & 1 and 5 & 3 are for forward/backward position movements
+    if (((b[6] == 1) && (b[0] == 1)) || ((b[6] == 1) && (b[2] == 1))) {
+        if (!llwa_mv && input_end) {
+            cout << "new left arm config" << endl;
+            // if not moving currently, update reset and move flags
+            llwa_reset = true;
+            llwa_mv = true;
+            // we only update our target if we have reach our previous target or
+            // the direction is difference
+            if (llwa_reached || (((b[0] == 1) && (llwa_dir == -1 )) || (( b[2] == 1) && (llwa_dir == 1)))) {
+                // if reached previous location, decrease/increase target by
+                // step
+                if (b[0] == 1) {
+                    llwa_dir = 1;
+                } else {
+                    llwa_dir = -1;
+                }
+                cout << "left arm config id: " << llwa_config_idx;
+                cout << "size of preset config: " << presetArmConfsL.size();
+                llwa_config_idx = (llwa_config_idx + llwa_dir) % presetArmConfsL.size();
+                cout << "left arm config id: " << llwa_config_idx;
+                updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
+                printArmPos(llwa_pos_target, "left");
+                llwa_reached = false;
+            }
+        }
+        return;
+    }
+
+    // Right Arm
+
+    // button 6 & 4 for reset curret target
+    if ((b[7] == 1) && (b[3] == 1)) {
+        resetRlwaTarget();
+    }
+
+    // button 6 & 2 for reset to default position
+    if ((b[7] == 1) && (b[1] == 1)) {
+        if (!rlwa_mv && input_end) {
+            // if not moving currently, update reset and move flags
+            rlwa_reset = true;
+            rlwa_mv = true;
+            // update target
+            updateArmTarget(rlwa_pos_target, rlwa_pos_default);
+            printArmPos(rlwa_pos_target, "right");
+            // if we reached the previous destination, reset reached flag
+            if (rlwa_reached) {
+                rlwa_reached = false;
+                rlwa_dir = 0;
+            }
+        }
+        return;
+    }
+
+    // buttons 6 & 1 and 6 & 3 are for forward/backward position movements
+    if (((b[7] == 1) && (b[0] == 1)) || ((b[7] == 1) && (b[2] == 1))) {
+        if (!rlwa_mv && input_end) {
+            cout << "new right arm config" << endl;
+            // if not moving currently, update reset and move falgs
+            rlwa_reset = true;
+            rlwa_mv = true;
+
+            if (rlwa_reached || (((b[0] == 1) && (rlwa_dir == -1)) || ((b[2] == 1) && (rlwa_dir == 1)))) {
+                // if reached previous location, decrease/increase target by
+                // step
+                if (b[0] == 1) {
+                    rlwa_dir = 1;
+                } else {
+                    rlwa_dir = -1;
+                }
+                cout << "right arm config id: " << rlwa_config_idx;
+                cout << "size of preset config: " << (presetArmConfsR.size());
+                rlwa_config_idx = (llwa_config_idx + llwa_dir) % presetArmConfsL.size();
+                cout << "right arm config id: " << rlwa_config_idx;
+                updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
+                printArmPos(rlwa_pos_target, "right");
+                rlwa_reached = false;
+            }
+        }
+        return;
+    }
+}
+
+/******************************************************************************/
+// Handles Torso
+void controlTorso() {
+
+    // axis LS down & button 4 for reset current target
+    if ((x[1] > 0.9) && (b[3] == 1)) {
+        resetTorsoTarget();
+    }
+
+    // axis LS down & button 2 for reset to default position
+    if ((x[1] > 0.9) && (b[1] == 1)) {
+        if (!torso_mv && input_end) {
+            // if not moving currently, update reset and move flags
+            torso_reset = true;
+            torso_mv = true;
+
+            // update target
+            torso_pos_target = torso_pos_default;
+            cout << "new torso target: " << torso_pos_target << endl;
+
+            // if we reached the previous destination, reset reached flag
+            if (torso_reached) {
+                torso_reached = false;
+                torso_dir = 0;
+            }
+        }
+        return;
+    }
+
+    // axis LS down & button 1 and axis LS down & button 3 are for forward/backward position movements
+    if (((x[1] > 0.9) && (b[0] == 1)) || ((x[1] > 0.9) && (b[2] == 1))) {
+        if (!torso_mv && input_end) {
+            // if not moving currently, update reset and move flags
+            torso_reset = true;
+            torso_mv = true;
+
+            if (torso_reached || (((b[0] == 1) && (torso_dir == -1)) || ((b[2] == 1) && (torso_dir == 1)))) {
+                // if reached previous location, decrease/increase target by
+                // step
+                if (b[0] == 1) {
+                    torso_dir = 1;
+                } else {
+                    torso_dir = -1;
+                }
+                torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
+                torso_pos_target = presetTorsoConfs[torso_config_idx];
+                cout << "new torso target: " << torso_pos_target << endl;
+                torso_reached = false;
+            }
+        }
+        return;
+    }
+}
+
+/******************************************************************************/
 // Handles Torso and Arms
 void controlTorsoAndArms() {
+
     // button 5 & 7 & 8 & 4 for reset current target
     if ((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[3] == 1)) {
-        resetAllJointsTarget();
+        //resetWaistTarget();
+        resetTorsoTarget();
+        resetLlwaTarget();
+        resetRlwaTarget();
     }
 
     // button 5 & 7 & 8 & 2 for reset to default position
     if ((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[1] == 1)) {
-        if (!all_joints_mv && input_end) {
-        //if (!torso_mv && !llwa_mv && !rlwa_mv && input_end) {
+        if (!torso_mv && !llwa_mv && !rlwa_mv && input_end) {
             // if not moving currently, update reset and move flags
-            all_joints_reset = true;
-            all_joints_mv = true;
-            //waist_reset = true;
-            //waist_mv = true;
-            //torso_reset = true;
-            //torso_mv = true;
-            //llwa_reset = true;
-            //llwa_mv = true;
-            //rlwa_reset = true;
-            //rlwa_mv = true;
+            waist_reset = true;
+            waist_mv = true;
+            torso_reset = true;
+            torso_mv = true;
+            llwa_reset = true;
+            llwa_mv = true;
+            rlwa_reset = true;
+            rlwa_mv = true;
 
             // update target
             waist_pos_target = waist_pos_default;
@@ -527,98 +679,78 @@ void controlTorsoAndArms() {
             printArmPos(rlwa_pos_target, "right");
 
             // if we reached the previous destination, reset reached flag
-            if (all_joints_reached) {
-            //if (torso_reached && llwa_reached && rlwa_reached) {
-                all_joints_reached = false;
-                all_joints_dir = 0;
-                //waist_reached = false;
-                //waist_dir = 0;
-                //torso_reached = false;
-                //torso_dir = 0;
-                //llwa_reached = false;
-                //llwa_dir = 0;
-                //rlwa_reached = false;
-                //rlwa_dir = 0;
+            if (torso_reached && llwa_reached && rlwa_reached) {
+                waist_reached = false;
+                waist_dir = 0;
+                torso_reached = false;
+                torso_dir = 0;
+                llwa_reached = false;
+                llwa_dir = 0;
+                rlwa_reached = false;
+                rlwa_dir = 0;
             }
         }
         return;
     }
 
-    // button 5 & 7 & 8 & 1 and button 5 & 7 & 8 & 3 are for backward/forward position movements
+    // button 5 & 7 & 8 & 3 and button 5 & 7 & 8 & 1 are for forward/backward position movements
     if (((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[2] == 1)) || ((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[0] == 1))) {
-        if (!all_joints_mv && input_end) {
-        //if (!torso_mv && !llwa_mv && !rlwa_mv && input_end) {
+        if (!torso_mv && !llwa_mv && !rlwa_mv && input_end) {
             // if not moving currently, update reset and move flags
-            all_joints_reset = true;
-            all_joints_mv = true;
-            //waist_reset = true;
-            //waist_mv = true;
-            //torso_reset = true;
-            //torso_mv = true;
-            //llwa_reset = true;
-            //llwa_mv = true;
-            //rlwa_reset = true;
-            //rlwa_mv = true;
+            waist_reset = true;
+            waist_mv = true;
+            torso_reset = true;
+            torso_mv = true;
+            llwa_reset = true;
+            llwa_mv = true;
+            rlwa_reset = true;
+            rlwa_mv = true;
 
             // we only update our target if we have reach our previous target or
             // the direction is difference
-            if ((all_joints_reached) || (((b[2] == 1) && (all_joints_dir == -1) || ((b[0] == 1) && (all_joints_dir == 1))) {
-            //if ((torso_reached && llwa_reached && rlwa_reached) || (((b[2] == 1) && ((torso_dir == -1) && (llwa_dir == -1) && (rlwa_dir == -1))) || ((b[0] == 1) && ((torso_dir == 1) && (llwa_dir == 1) && (rlwa_dir == 1))))) {
+            if ((torso_reached && llwa_reached && rlwa_reached) || (((b[2] == 1) && ((torso_dir == -1) && (llwa_dir == -1) && (rlwa_dir == -1))) || ((b[0] == 1) && ((torso_dir == 1) && (llwa_dir == 1) && (rlwa_dir == 1))))) {
                 // if reached previous location, decrease/increase target by
                 // step
                 if (b[2] == 1) {
-                    all_joints_dir = 1;
-                    //waist_dir = 1;
-                    //torso_dir = 1;
-                    //llwa_dir = 1;
-                    //rlwa_dir = 1;
+                    waist_dir = 1;
+                    torso_dir = 1;
+                    llwa_dir = 1;
+                    rlwa_dir = 1;
                 } else {
-                    all_joints_dir = -1;
-                    //waist_dir = -1;
-                    //torso_dir = -1;
-                    //llwa_dir = -1;
-                    //rlwa_dir = -1;
+                    waist_dir = -1;
+                    torso_dir = -1;
+                    llwa_dir = -1;
+                    rlwa_dir = -1;
                 }
 
-                //waist_config_idx = (waist_config_idx + waist_dir) % presetWaistConfs.size();
-                //waist_pos_target = presetWaistConfs[waist_config_idx];
-                //waist_reached = false;
 
-                //torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
-                //torso_pos_target = presetTorsoConfs[torso_config_idx];
-                //torso_reached = false;
+                waist_config_idx = (waist_config_idx + waist_dir) % presetWaistConfs.size();
+                waist_pos_target = presetWaistConfs[waist_config_idx];
+                cout << "new waist target: " << waist_pos_target << endl;
+                waist_reached = false;
+
+                torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
+                torso_pos_target = presetTorsoConfs[torso_config_idx];
+                cout << "new torso target: " << torso_pos_target << endl;
+                torso_reached = false;
 
                 //cout << "left arm config id: " << llwa_config_idx;
                 //cout << "size of preset config: " << presetArmConfsL.size();
-                //llwa_config_idx = (llwa_config_idx + llwa_dir) % presetArmConfsL.size();
+                llwa_config_idx = (llwa_config_idx + llwa_dir) % presetArmConfsL.size();
                 //cout << "left arm config id: " << llwa_config_idx;
-                //updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
-                //llwa_reached = false;
+                updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
+                printArmPos(llwa_pos_target, "left");
+                llwa_reached = false;
 
                 //cout << "right arm config id: " << rlwa_config_idx;
                 //cout << "size of preset config: " << (presetArmConfsR.size());
-                //rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % presetArmConfsR.size();
+                rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % presetArmConfsR.size();
                 //cout << "right arm config id: " << rlwa_config_idx;
-                //updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
-                //rlwa_reached = false;
-
-				//cout << "Config IDs: W: " << waist_config_idx << ", T: " << torso_config_idx << ", L: " << llwa_config_idx << ", R:" << rlwa_config_idx << endl;
-
-                all_joints_config_idx = (all_joints_config_idx + all_joints_dir) % presetArmConfsL.size();
-
-                waist_pos_target = presetWaistConfs[all_joints_config_idx];
-                torso_pos_target = presetTorsoConfs[all_joints_config_idx];
-                updateArmTarget(llwa_pos_target, presetArmConfsL[all_joints_config_idx]);
-                updateArmTarget(rlwa_pos_target, presetArmConfsR[all_joints_config_idx]);
-
-                cout << "new waist target: " << waist_pos_target << endl;
-                cout << "new torso target: " << torso_pos_target << endl;
-                printArmPos(llwa_pos_target, "left");
+                updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
                 printArmPos(rlwa_pos_target, "right");
 
-				cout << "Pose Number: " << all_joints_config_idx << endl;
-
-                all_joints_reached = false;
+                rlwa_reached = false;
+				cout << "Config IDs: W: " << waist_config_idx << ", T: " << torso_config_idx << ", L: " << llwa_config_idx << ", R:" << rlwa_config_idx << endl;
             }
         }
         return;
@@ -628,22 +760,21 @@ void controlTorsoAndArms() {
 /******************************************************************************/
 // Handles Joystick Commands
 void processJS() {
+
     controlTorsoAndArms();
 
     // if no buttons are actively pressed we halt all movements
     if (buttonPressed()) {
         input_end = false;
     } else {
-        //pose_mv = (torso_mv || llwa_mv || rlwa_mv);
-        pose_mv = all_joints_mv;
+        pose_mv = (torso_mv || llwa_mv || rlwa_mv);
         if (pose_mv) { // released button while moving)
             hlt_mv = true;
             pose_mv = false;
-            all_joints_mv = false;
-            //waist_mv = false;
-            //torso_mv = false;
-            //llwa_mv = false;
-            //rlwa_mv = false;
+            waist_mv = false;
+            torso_mv = false;
+            llwa_mv = false;
+            rlwa_mv = false;
         }
         input_end = true;
     }
@@ -663,32 +794,27 @@ void moveArm(somatic_motor_t &arm, double target[]) {
 // Check each body part and send motor reset/movement commands (other than
 // waist)
 void applyMove() {
+
     if (hlt_mv) {
         haltMovement();
         hlt_mv = false;
     }
 
     // For full body movements
-    //if (torso_reset && llwa_reset && rlwa_reset) {
-    if (all_joints_reset) {
-
-        somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 1, NULL);
-        somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
-        somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
-        all_joints_reset = false;
+    if (torso_reset && llwa_reset && rlwa_reset) {
 
         //cout << "resetting torso" << endl;
         //cout << "resetting left arm" << endl;
         //cout << "resetting right arm" << endl;
 
-        //somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 1, NULL);
-        //torso_reset = false;
+        somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 1, NULL);
+        torso_reset = false;
 
-        //somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
-        //llwa_reset = false;
+        somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
+        llwa_reset = false;
 
-        //somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
-        //rlwa_reset = false;
+        somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
+        rlwa_reset = false;
     }
 
     usleep(1e5);
@@ -753,43 +879,36 @@ bool checkArm(double pos[7], double target[7], double tol) {
 /******************************************************************************/
 // Update poses and stop movements if we have reached our goals
 void poseUpdate() {
+
     somatic_motor_update(&daemon_cx, &torso);
     somatic_motor_update(&daemon_cx, &llwa);
     somatic_motor_update(&daemon_cx, &rlwa);
 
     // check full body configuration
-    //if (((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) && (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) && (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached)) {
-    if ((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && (checkArm(llwa.pos, llwa_pos_target, POSE_TOL)) && (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL)) && !all_joints_reached) {
+    if (((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) && (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) && (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached)) {
 
-        // torso specific
+        // waist
+        waist_reached = true;
+
+        // torso
         double dq[] = {0.0};
         somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
         somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
-        all_joints_reached = true;
+        torso_reached = true;
 
-        cout << "********************************" << endl;
-		cout << "****** INTERPOSE REACHED *******" << endl;
-        cout << "********************************" << endl;
+        // left arm
+        llwa_reached = true;
 
-        // waist
-        //waist_reached = true;
-
-        //// torso
-        //double dq[] = {0.0};
-        //somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
-        //somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
-        //torso_reached = true;
-
-        //// left arm
-        //llwa_reached = true;
-
-        //// right arm
-        //rlwa_reached = true;
+        // right arm
+        rlwa_reached = true;
 
         //cout << "torso target reached" << endl;
         //cout << "left arm target reached" << endl;
         //cout << "right arm target reached" << endl;
 
+        cout << "********************************" << endl;
+		cout << "****** INTERPOSE REACHED *******" << endl;
+        cout << "********************************" << endl;
     }
 
 
@@ -852,6 +971,7 @@ void run() {
 /******************************************************************************/
 // Close channels and daemons
 void destroy() {
+
     // Halt the waist modules
     static Somatic__WaistCmd *waistDaemonCmd = somatic_waist_cmd_alloc();
     somatic_waist_cmd_set(waistDaemonCmd, SOMATIC__WAIST_MODE__STOP);
