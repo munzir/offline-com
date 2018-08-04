@@ -256,17 +256,16 @@ void recordPoseData() {
 // press d and enter to record / press x and enter to flag to ignore previous
 // line
 void *kbhit(void *) {
-    //char input
-    string input;
+    char input;
     double kOffset = 0.05;
     while (true) {
         input = cin.get();
         pthread_mutex_lock(&mutex);
 
-        if (input == "pd") {
+        if (input == 'd') {
             recordPoseData();
         }
-        if (input == "px") {
+        if (input == 'x') {
             pose_out_file << "DELETE PREVIOUS LINE" << endl;
         }
         pthread_mutex_unlock(&mutex);
@@ -622,12 +621,16 @@ void poseUpdate() {
 		    cout << "****** WAIST SAFE REACHED ******" << endl;
             cout << "********************************" << endl;
             cout << "* Current Waist Pose should be *" << endl;
-            cout << "****    " + to_string(waist_pos_target) + "    ****" << endl;
+            cout << "********    " + to_string(waist_pos_target) + "    ********" << endl;
             cout << "******* before moving on! ******" << endl;
             cout << "********************************" << endl;
         } else {
             cout << "********************************" << endl;
 		    cout << "****** INTERPOSE REACHED *******" << endl;
+            cout << "********************************" << endl;
+            cout << "* Current Waist Pose should be *" << endl;
+            cout << "********    " + to_string(waist_pos_target) + "    ********" << endl;
+            cout << "******* before moving on! ******" << endl;
             cout << "********************************" << endl;
         }
 
@@ -644,7 +647,7 @@ void run() {
     readPoseFile();
 
 
-    cout << "ready to control" << endl;
+    cout << "ready for control ..." << endl;
     // Unless an interrupt or terminate message is received, process the new
     // message
     while (!somatic_sig_received) {

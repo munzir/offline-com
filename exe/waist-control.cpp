@@ -155,14 +155,18 @@ void recordWaistData() {
 void controlWaist() {
 	Somatic__WaistMode waistMode;
 	if (x[5] < -0.9) {
-        waistMode = SOMATIC__WAIST_MODE__MOVE_FWD;
-    } else if (x[5] > 0.9) {
-        waistMode = SOMATIC__WAIST_MODE__MOVE_REV;
-    } else {
-        waistMode = SOMATIC__WAIST_MODE__STOP;
-    }
+      waistMode = SOMATIC__WAIST_MODE__MOVE_FWD;
+  		getWaistState();		
+			cout << waistDataStruct.qWaist << endl; //i
+	} else if (x[5] > 0.9) {
+      waistMode = SOMATIC__WAIST_MODE__MOVE_REV;
+ 			getWaistState(); 
+			cout << waistDataStruct.qWaist << endl;
+	} else {
+      waistMode = SOMATIC__WAIST_MODE__STOP;
+  }
 
-	//send message
+	// Send message
 	somatic_waist_cmd_set(waistDaemonCmd, waistMode);
 	int r = SOMATIC_PACK_SEND(&waistCmdChan, somatic__waist_cmd, waistDaemonCmd);
 	if(ACH_OK != r) fprintf(stderr, "Couldn't send message: %s\n",
