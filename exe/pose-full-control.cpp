@@ -81,63 +81,45 @@ bool hlt_mv = false;
 
 bool pose_mv = false;
 bool all_joints_mv = false;
-//bool llwa_mv = false;
-//bool rlwa_mv = false;
-//bool torso_mv = false;
-//bool waist_mv = false;
 
 bool all_joints_reached = true;
-//bool llwa_reached = true;
-//bool rlwa_reached = true;
-//bool torso_reached = true;
-//bool waist_reached = true;
 
 // -1 for backwards direction and 1 for positive direction in pose file
 int all_joints_dir = 0;
-//int llwa_dir = 0;
-//int rlwa_dir = 0;
-//int torso_dir = 0;
-//int waist_dir = 0;
 
 bool all_joints_reset = false;
-//bool llwa_reset = false;
-//bool rlwa_reset = false;
-//bool torso_reset = false;
-//bool waist_reset = false;
 
-double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-double rlwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-double torso_pos_target = 0.0;
 // TODO this might be a dangerous default value
 // Check below waist value again if waist control is ever implemented in this
 // script
 double waist_pos_target = 0.0;
+double torso_pos_target = 0.0;
+double llwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+double rlwa_pos_target[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-vector<double> llwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-vector<double> rlwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-double torso_pos_default = 0.0;
 // TODO this might be a dangerous default value
 // Check below waist value again if waist control is ever implemented in this
 // script
 double waist_pos_default = 0.0;
+double torso_pos_default = 0.0;
+vector<double> llwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+vector<double> rlwa_pos_default = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+// Waist safe pose
+double torso_waist_safe_pos= 0.0;
+double llwa_waist_safe_pos[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+double rlwa_waist_safe_pos[7] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 // Index of the current pose in the read file
 int all_joints_config_idx = 0;
-//int llwa_config_idx = 0;
-//int rlwa_config_idx = 0;
-//int torso_config_idx = 0;
-//int waist_config_idx = 0;
 
+vector<double> presetWaistConfs;
+vector<double> presetTorsoConfs;
 vector<vector<double>> presetArmConfsL;
 vector<vector<double>> presetArmConfsR;
-vector<double> presetTorsoConfs;
-vector<double> presetWaistConfs;
 
-// TODO add extract filename from path functionality
-// INPUT on below line (input and output file names)
-string inputPoseFilename = "interposeTraj1-2.txt"
-ifstream pose_in_file("../data/dataIn/poseTrajectoriesrfinalSet/" + inputPoseFilename + ".txt");
-ofstream pose_out_file("../data/dataOut/" + inputPoseFilename + "out.txt", ios::app);
+ifstream pose_in_file;
+ofstream pose_out_file;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -192,6 +174,7 @@ void readPoseFile() {
                 // yet)
                 if (i == 8) {
                     presetWaistConfs.push_back(doubNum);
+                }
                 if (i == 9) {
                     presetTorsoConfs.push_back(doubNum);
                 }
@@ -212,35 +195,9 @@ void readPoseFile() {
 
     // Print out the file read for confirmation
 
-    //cout << "read over" << endl;
-    //cout << "total configurations read: " << count << endl;
-    //pose_in_file.close();
+    cout << "total configurations read: " << count << endl;
+    pose_in_file.close();
 
-    //cout << "waist configurations" << endl;
-    //for (auto c : presetWaistConfs) {
-    //    cout << c << endl;
-    //}
-
-    //cout << "torso configurations" << endl;
-    //for (auto c : presetTorsoConfs) {
-    //    cout << c << endl;
-    //}
-
-    //cout << "left arm configurations: " << endl;
-    //for (auto c : presetArmConfsL) {
-    //    for (auto d : c) {
-    //        cout << d << ", ";
-    //    }
-    //    cout << endl;
-    //}
-
-    //cout << "right arm configurations: " << endl;
-    //for (auto c : presetArmConfsL) {
-    //    for (auto d : c) {
-    //        cout << d << ", ";
-    //    }
-    //    cout << endl;
-    //}
 }
 
 /******************************************************************************/
@@ -254,8 +211,8 @@ double getWaistState() {
     while (waist == NULL) waist = getMotorMessage(waistChan);
     // Below line takes the average of the two waist motor readings
     // The second one is negative, hence the subtraction
-    double waist_val = (waist->position->data[0] - waist->position->data[1]) / 2.0;
-    return waist_val;
+    double waist_pos = (waist->position->data[0] - waist->position->data[1]) / 2.0;
+    return waist_pos;
 }
 
 /******************************************************************************/
@@ -270,9 +227,9 @@ void recordPoseData() {
     cout << "imu value: " << imu_val << endl;
     pose_out_file << imu_val;
 
-    double waist_val = getWaistState();
-    cout << "waist value: " << waist_val << endl;
-    pose_out_file << " " << waist_val;
+    double waist_pos = getWaistState();
+    cout << "waist value: " << waist_pos << endl;
+    pose_out_file << " " << waist_pos;
 
     somatic_motor_update(&daemon_cx, &torso);
     cout << "torso value: " << torso.pos[0] << endl;
@@ -299,15 +256,17 @@ void recordPoseData() {
 // press d and enter to record / press x and enter to flag to ignore previous
 // line
 void *kbhit(void *) {
-    char input;
+    //char input
+    string input;
     double kOffset = 0.05;
     while (true) {
         input = cin.get();
         pthread_mutex_lock(&mutex);
-        if (input == 'd') {
+
+        if (input == "pd") {
             recordPoseData();
         }
-        if (input == 'x') {
+        if (input == "px") {
             pose_out_file << "DELETE PREVIOUS LINE" << endl;
         }
         pthread_mutex_unlock(&mutex);
@@ -328,7 +287,7 @@ void readJoystick() {
     for (size_t i = 0; i < 10; i++)
         b[i] = js_msg->buttons->data[i] ? 1: 0;
 
-    //copy over axes data
+    // copy over axes data
     memcpy(x, js_msg->axes->data, sizeof(x));
 
     // Free the joystick message
@@ -503,22 +462,13 @@ void controlTorsoAndArms() {
     // button 5 & 7 & 8 & 2 for reset to default position
     if ((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[1] == 1)) {
         if (!all_joints_mv && input_end) {
-        //if (!torso_mv && !llwa_mv && !rlwa_mv && input_end) {
             // if not moving currently, update reset and move flags
             all_joints_reset = true;
             all_joints_mv = true;
-            //waist_reset = true;
-            //waist_mv = true;
-            //torso_reset = true;
-            //torso_mv = true;
-            //llwa_reset = true;
-            //llwa_mv = true;
-            //rlwa_reset = true;
-            //rlwa_mv = true;
 
             // update target
             waist_pos_target = waist_pos_default;
-            cout << "new waist targe: " << waist_pos_target << endl;
+            cout << "new waist target: " << waist_pos_target << endl;
             torso_pos_target = torso_pos_default;
             cout << "new torso target: " << torso_pos_target << endl;
             updateArmTarget(llwa_pos_target, llwa_pos_default);
@@ -528,17 +478,8 @@ void controlTorsoAndArms() {
 
             // if we reached the previous destination, reset reached flag
             if (all_joints_reached) {
-            //if (torso_reached && llwa_reached && rlwa_reached) {
                 all_joints_reached = false;
                 all_joints_dir = 0;
-                //waist_reached = false;
-                //waist_dir = 0;
-                //torso_reached = false;
-                //torso_dir = 0;
-                //llwa_reached = false;
-                //llwa_dir = 0;
-                //rlwa_reached = false;
-                //rlwa_dir = 0;
             }
         }
         return;
@@ -547,62 +488,20 @@ void controlTorsoAndArms() {
     // button 5 & 7 & 8 & 1 and button 5 & 7 & 8 & 3 are for backward/forward position movements
     if (((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[2] == 1)) || ((b[4] == 1) && (b[6] == 1) && (b[7] == 1) && (b[0] == 1))) {
         if (!all_joints_mv && input_end) {
-        //if (!torso_mv && !llwa_mv && !rlwa_mv && input_end) {
             // if not moving currently, update reset and move flags
             all_joints_reset = true;
             all_joints_mv = true;
-            //waist_reset = true;
-            //waist_mv = true;
-            //torso_reset = true;
-            //torso_mv = true;
-            //llwa_reset = true;
-            //llwa_mv = true;
-            //rlwa_reset = true;
-            //rlwa_mv = true;
 
             // we only update our target if we have reach our previous target or
             // the direction is difference
-            if ((all_joints_reached) || (((b[2] == 1) && (all_joints_dir == -1) || ((b[0] == 1) && (all_joints_dir == 1))) {
-            //if ((torso_reached && llwa_reached && rlwa_reached) || (((b[2] == 1) && ((torso_dir == -1) && (llwa_dir == -1) && (rlwa_dir == -1))) || ((b[0] == 1) && ((torso_dir == 1) && (llwa_dir == 1) && (rlwa_dir == 1))))) {
+            if ((all_joints_reached) || (((b[2] == 1) && (all_joints_dir == -1)) || ((b[0] == 1) && (all_joints_dir == 1)))) {
                 // if reached previous location, decrease/increase target by
                 // step
                 if (b[2] == 1) {
                     all_joints_dir = 1;
-                    //waist_dir = 1;
-                    //torso_dir = 1;
-                    //llwa_dir = 1;
-                    //rlwa_dir = 1;
                 } else {
                     all_joints_dir = -1;
-                    //waist_dir = -1;
-                    //torso_dir = -1;
-                    //llwa_dir = -1;
-                    //rlwa_dir = -1;
                 }
-
-                //waist_config_idx = (waist_config_idx + waist_dir) % presetWaistConfs.size();
-                //waist_pos_target = presetWaistConfs[waist_config_idx];
-                //waist_reached = false;
-
-                //torso_config_idx = (torso_config_idx + torso_dir) % presetTorsoConfs.size();
-                //torso_pos_target = presetTorsoConfs[torso_config_idx];
-                //torso_reached = false;
-
-                //cout << "left arm config id: " << llwa_config_idx;
-                //cout << "size of preset config: " << presetArmConfsL.size();
-                //llwa_config_idx = (llwa_config_idx + llwa_dir) % presetArmConfsL.size();
-                //cout << "left arm config id: " << llwa_config_idx;
-                //updateArmTarget(llwa_pos_target, presetArmConfsL[llwa_config_idx]);
-                //llwa_reached = false;
-
-                //cout << "right arm config id: " << rlwa_config_idx;
-                //cout << "size of preset config: " << (presetArmConfsR.size());
-                //rlwa_config_idx = (rlwa_config_idx + rlwa_dir) % presetArmConfsR.size();
-                //cout << "right arm config id: " << rlwa_config_idx;
-                //updateArmTarget(rlwa_pos_target, presetArmConfsR[rlwa_config_idx]);
-                //rlwa_reached = false;
-
-				//cout << "Config IDs: W: " << waist_config_idx << ", T: " << torso_config_idx << ", L: " << llwa_config_idx << ", R:" << rlwa_config_idx << endl;
 
                 all_joints_config_idx = (all_joints_config_idx + all_joints_dir) % presetArmConfsL.size();
 
@@ -640,10 +539,6 @@ void processJS() {
             hlt_mv = true;
             pose_mv = false;
             all_joints_mv = false;
-            //waist_mv = false;
-            //torso_mv = false;
-            //llwa_mv = false;
-            //rlwa_mv = false;
         }
         input_end = true;
     }
@@ -677,23 +572,11 @@ void applyMove() {
         somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
         all_joints_reset = false;
 
-        //cout << "resetting torso" << endl;
-        //cout << "resetting left arm" << endl;
-        //cout << "resetting right arm" << endl;
-
-        //somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 1, NULL);
-        //torso_reset = false;
-
-        //somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
-        //llwa_reset = false;
-
-        //somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
-        //rlwa_reset = false;
     }
 
     usleep(1e5);
 
-    if (torso_mv && llwa_mv && rlwa_mv) {
+    if (all_joints_mv) {
         double torso_pos_array[1] = {torso_pos_target};
         somatic_motor_cmd(&daemon_cx, &torso, POSITION, torso_pos_array, 1, NULL);
         somatic_motor_update(&daemon_cx, &llwa);
@@ -702,40 +585,6 @@ void applyMove() {
         moveArm(rlwa, rlwa_pos_target);
     }
 
-    // For segmented movements
-    //if (torso_reset) {
-    //    somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 1, NULL);
-    //    torso_reset = false;
-    //}
-
-    //if (llwa_reset) {
-    //    cout << "resetting left arm" << endl;
-    //    somatic_motor_cmd(&daemon_cx, &llwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
-    //    llwa_reset = false;
-    //}
-
-    //if (rlwa_reset) {
-    //    cout << "resetting right arm" << endl;
-    //    somatic_motor_cmd(&daemon_cx, &rlwa, SOMATIC__MOTOR_PARAM__MOTOR_RESET, NULL, 7, NULL);
-    //    rlwa_reset = false;
-    //}
-
-    //usleep(1e5);
-
-    //if (torso_mv) {
-    //    double torso_pos_array[1] = {torso_pos_target};
-    //    somatic_motor_cmd(&daemon_cx, &torso, POSITION, torso_pos_array, 1, NULL);
-    //}
-
-    //if (llwa_mv) {
-    //    somatic_motor_update(&daemon_cx, &llwa);
-    //    moveArm(llwa, llwa_pos_target);
-    //}
-
-    //if (rlwa_mv) {
-    //    somatic_motor_update(&daemon_cx, &rlwa);
-    //    moveArm(rlwa, rlwa_pos_target);
-    //}
 }
 
 /******************************************************************************/
@@ -758,62 +607,32 @@ void poseUpdate() {
     somatic_motor_update(&daemon_cx, &rlwa);
 
     // check full body configuration
-    //if (((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) && (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) && (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached)) {
     if ((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && (checkArm(llwa.pos, llwa_pos_target, POSE_TOL)) && (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL)) && !all_joints_reached) {
 
         // torso specific
         double dq[] = {0.0};
         somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
         somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
+
         all_joints_reached = true;
 
-        cout << "********************************" << endl;
-		cout << "****** INTERPOSE REACHED *******" << endl;
-        cout << "********************************" << endl;
+        if (torso_pos_target == torso_waist_safe_pos && checkArm(llwa_pos_target, llwa_waist_safe_pos, POSE_TOL) && checkArm(rlwa_pos_target, rlwa_waist_safe_pos, POSE_TOL)) {
 
-        // waist
-        //waist_reached = true;
-
-        //// torso
-        //double dq[] = {0.0};
-        //somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
-        //somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
-        //torso_reached = true;
-
-        //// left arm
-        //llwa_reached = true;
-
-        //// right arm
-        //rlwa_reached = true;
-
-        //cout << "torso target reached" << endl;
-        //cout << "left arm target reached" << endl;
-        //cout << "right arm target reached" << endl;
+            cout << "********************************" << endl;
+		    cout << "****** WAIST SAFE REACHED ******" << endl;
+            cout << "********************************" << endl;
+            cout << "* Current Waist Pose should be *" << endl;
+            cout << "****    " + to_string(waist_pos_target) + "    ****" << endl;
+            cout << "******* before moving on! ******" << endl;
+            cout << "********************************" << endl;
+        } else {
+            cout << "********************************" << endl;
+		    cout << "****** INTERPOSE REACHED *******" << endl;
+            cout << "********************************" << endl;
+        }
 
     }
 
-
-    // Below checks for segemented body individually
-    // check torso configuration
-    //if ((fabs(torso.pos[0] - torso_pos_target) <= POSE_TOL) && !torso_reached) {
-    //    cout << "torso target reached" << endl;
-    //    double dq[] = {0.0};
-    //    somatic_motor_cmd(&daemon_cx, &torso, VELOCITY, dq, 1, NULL);
-    //    somatic_motor_cmd(&daemon_cx, &torso, SOMATIC__MOTOR_PARAM__MOTOR_HALT, NULL, 1, NULL);
-    //    torso_reached = true;
-    //}
-
-    //// check left arm configuration
-    //if (checkArm(llwa.pos, llwa_pos_target, POSE_TOL) && !llwa_reached) {
-    //    cout << "left arm target reached" << endl;
-    //    llwa_reached = true;
-    //}
-
-    //// check right arm configuration
-    //if (checkArm(rlwa.pos, rlwa_pos_target, POSE_TOL) && !rlwa_reached) {
-    //    cout << "right arm target reached" << endl;
-    //    rlwa_reached = true;
-    //}
 }
 
 /******************************************************************************/
@@ -824,6 +643,8 @@ void run() {
 
     readPoseFile();
 
+
+    cout << "ready to control" << endl;
     // Unless an interrupt or terminate message is received, process the new
     // message
     while (!somatic_sig_received) {
@@ -881,7 +702,20 @@ void destroy() {
 
 /******************************************************************************/
 // Main Method
-int main() {
+int main(int argc, char *argv[]) {
+    // TODO add extract filename from path functionality
+    // INPUT on below line (input and output file names)
+    string trajNum = argv[1];
+    //string trajNum = "1-2";
+    string inputPoseBaseFilename = "interposeTraj" + trajNum;
+    string inputPoseFilename = "../data/dataIn/poseTrajectoriesrfinalSet/" + inputPoseBaseFilename + ".txt";
+    string outputBalancedPoseFilename = "../data/dataOut/" + inputPoseBaseFilename + "balancedPoseOut.txt";
+
+    cout << "reading file: " + inputPoseBaseFilename << endl;
+    pose_in_file.open(inputPoseFilename);
+    pose_out_file.open(outputBalancedPoseFilename, ios::app);
+
+    // Run controller code
     init();
     run();
     destroy();

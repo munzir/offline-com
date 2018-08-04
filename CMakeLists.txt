@@ -30,14 +30,16 @@ include_directories(EIGEN3_INCLUDE_DIR)
 # Include the project files and the common helpers for all the experiments
 include_directories(src)
 include_directories(../common)
-#include_directories(/home/cerdogan/Documents/Software/drivers/krang-waist)
 
 # Collect the source, script and fortran files
 #file(GLOB main_source "src/*.cpp" "src/*.c")
 #file(GLOB scripts_source "exe/*.cpp")
 
+# To compile specific source files
+file(GLOB scripts_source "exe/pose-full-control.cpp" "exe/waist-control.cpp")
+#file(GLOB scripts_source "exe/pose-full-control.cpp")
+#file(GLOB scripts_source "exe/waist-control.cpp")
 #file(GLOB scripts_source "exe/pose-control.cpp")
-file(GLOB scripts_source "exe/pose-full-control.cpp")
 
 LIST(SORT scripts_source)
 
