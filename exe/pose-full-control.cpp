@@ -514,7 +514,7 @@ void controlTorsoAndArms() {
                 printArmPos(llwa_pos_target, "left");
                 printArmPos(rlwa_pos_target, "right");
 
-				cout << "Pose Number: " << all_joints_config_idx << endl;
+				cout << "Pose Number: " << all_joints_config_idx << "/" << presetArmConfsL.size()-1 << endl;
 
                 all_joints_reached = false;
             }
