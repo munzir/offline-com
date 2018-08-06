@@ -1,3 +1,44 @@
-.idea
-cmake-build-debug
-build
+# Exclude all files/directories except the ones I want
+/*
+
+# .gitignore
+!.gitignore
+
+# Readme
+!README.md
+
+# CMake
+CMakeLists.txt
+
+# Helper Scripts
+LibertyClient.cpp
+
+# cmake folder
+!/cmake/
+
+# src folder
+simTab.h
+
+# data folder
+!/data/
+
+# exe folder
+!/exe/
+/exe/*
+!/exe/reference
+!/exe/joystick.cpp
+!/exe/pose-control.cpp
+!/exe/pose-full-control.cpp
+!/exe/pose-full-control-cruft.cpp
+!/exe/shoulder-demo.cpp
+!/exe/teleop-ui-daemons.sh
+!/exe/waist-control.cpp
+
+# process_data folder
+!/process_data
+/process_data/*
+!/process_data/process-com-output.py
+!/process_data/convert_data_formats/
+/process_data/convert_data_formats/*
+!/process_data/convert_data_formats/CMakeLists.txt
+!/process_data/convert_data_formats/convert_krang_to_dart.cpp
