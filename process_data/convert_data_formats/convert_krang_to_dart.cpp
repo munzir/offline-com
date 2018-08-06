@@ -55,8 +55,8 @@ int main() {
     // Options: dart2munzir, munzir2dart, krang2munzir
 
     //INPUT on below line (input file to convert)
-    //string inputPosesFilename = "../../output-balanced-poses.txt";
-    string inputPosesFilename = "output-balanced-posesmunzir.txt";
+    //string inputPosesFilename = "../../hardware-balanced-poses.txt";
+    string inputPosesFilename = "hardware-balanced-posesmunzir.txt";
 
     //INPUT on below line (full robot path)
     string fullRobotPath = "/home/apatel435/Desktop/WholeBodyControlAttempt1/09-URDF/Krang/KrangNoKinect.urdf";

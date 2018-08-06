@@ -2,7 +2,7 @@ import os
 
 DATA_DIR = '../data/dataOut'
 # get file
-out_file = open('output-balanced-poses.txt', 'wb')
+out_file = open('hardware-balanced-poses.txt', 'wb')
 # Get File Names
 file_names = os.listdir(DATA_DIR)
 
