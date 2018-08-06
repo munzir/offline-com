@@ -49,12 +49,14 @@ int main() {
     // TODO: Command line flags and arguments
 
     //INPUT on below line (output format)
-    string convert = "krang2dart";
+    //string convert = "krang2dart";
     //string convert = "krang2munzir";
+    string convert = "munzir2dart";
     // Options: dart2munzir, munzir2dart, krang2munzir
 
     //INPUT on below line (input file to convert)
-    string inputPosesFilename = "../randomPoses5000.txt";
+    //string inputPosesFilename = "../../output-balanced-poses.txt";
+    string inputPosesFilename = "output-balanced-posesmunzir.txt";
 
     //INPUT on below line (full robot path)
     string fullRobotPath = "/home/apatel435/Desktop/WholeBodyControlAttempt1/09-URDF/Krang/KrangNoKinect.urdf";
@@ -162,7 +164,7 @@ Eigen::MatrixXd krangToMunzir(Eigen::RowVectorXd krangPose) {
     double qRWheel = 0;
 
     // Now compile this data into munzir pose
-    Eigen::Matrix<double, 24, 1> munzirPose;
+    Eigen::Matrix<double, 23, 1> munzirPose;
     munzirPose << heading, qBase, x, y, z, qLWheel, qRWheel, unchangedValues;
 
     return munzirPose;
@@ -174,8 +176,8 @@ Eigen::MatrixXd munzirToDart(Eigen::RowVectorXd munzirPose) {
     // Find the pose in DART formats
     double headingInit = munzirPose(0);
     double qBaseInit = munzirPose(1);
-    Eigen::Matrix<double, 22, 1> unchangedValues;
-    unchangedValues << munzirPose.segment(2,22).transpose();
+    Eigen::Matrix<double, 21, 1> unchangedValues;
+    unchangedValues << munzirPose.segment(2,21).transpose();
 
     // Calculating the axis angle representation of orientation from headingInit and qBaseInit:
     // RotX(pi/2)*RotY(-pi/2+headingInit)*RotX(-qBaseInit)
@@ -184,7 +186,7 @@ Eigen::MatrixXd munzirToDart(Eigen::RowVectorXd munzirPose) {
     Eigen::AngleAxisd aa(baseTf.matrix().block<3,3>(0,0));
 
     // Now compile this data into dartPoseParams
-    Eigen::Matrix<double, 25, 1> dartPose;
+    Eigen::Matrix<double, 24, 1> dartPose;
     dartPose << aa.angle()*aa.axis(), unchangedValues;
 
     return dartPose;
@@ -192,8 +194,8 @@ Eigen::MatrixXd munzirToDart(Eigen::RowVectorXd munzirPose) {
 
 Eigen::MatrixXd dartToMunzir(Eigen::RowVectorXd dartPose, SkeletonPtr robot) {
     // Find the pose in munzir format
-    Eigen::Matrix<double, 22, 1> unchangedValues;
-    unchangedValues << dartPose.segment(3,22).transpose();
+    Eigen::Matrix<double, 21, 1> unchangedValues;
+    unchangedValues << dartPose.segment(3,21).transpose();
 
     // Calculating the headingInit and qBase Init from the axis angle representation of orientation:
     robot->setPositions(dartPose);
@@ -205,7 +207,7 @@ Eigen::MatrixXd dartToMunzir(Eigen::RowVectorXd dartPose, SkeletonPtr robot) {
     //double qBaseInit = atan2(baseTf(2,1), baseTf(2,2));
 
     // Now compile this data into munzir pose
-    Eigen::Matrix<double, 24, 1> munzirPose;
+    Eigen::Matrix<double, 23, 1> munzirPose;
     munzirPose << headingInit, qBaseInit, unchangedValues;
 
     return munzirPose;
