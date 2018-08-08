@@ -95,8 +95,8 @@ void getWaistState() {
 
 	// Get data from waist and put it into struct
 	waistDataStruct.qWaist = (waist->position->data[0] - waist->position->data[1]) /2.0;
-	waistDataStruct.dqWaist = (waist->velocity->data[0]);
-	waistDataStruct.currSomWaist = (waist->current->data[0]);
+	waistDataStruct.dqWaist = (waist->velocity->data[0] - waist->velocity->data[1]) /2.0;
+	waistDataStruct.currSomWaist = (waist->current->data[0] - waist->current->data[1])/2.0;
 }
 
 /******************************************************************************/
