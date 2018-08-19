@@ -11,8 +11,8 @@
 #include <time.h>
 #include <sys/time.h>
 
-#include "initModules.h"
-#include "motion.h"
+#include "/home/munzir/project/krang/experiments/common/initModules.h"
+#include "/home/munzir/project/krang/experiments/common/motion.h"
 
 // // Namespaces
 using namespace std;
@@ -21,7 +21,7 @@ using namespace std;
 #define VELOCITY SOMATIC__MOTOR_PARAM__MOTOR_VELOCITY
 #define POSITION SOMATIC__MOTOR_PARAM__MOTOR_POSITION
 #define getMotorMessage(x) (SOMATIC_WAIT_LAST_UNPACK(r, somatic__motor_state, \
-    &protobuf_c_system_allocator, 1024, &x, &abstime))
+    NULL, 1024, &x, &abstime))
 
 // // Global Stuff
 // Init somatic daemon
@@ -68,7 +68,7 @@ void readJoystick() {
     // Get the message and check output is OK.
     int r = 0;
     Somatic__Joystick *js_msg =
-        SOMATIC_GET_LAST_UNPACK( r, somatic__joystick, &protobuf_c_system_allocator, 4096, &js_chan );
+        SOMATIC_GET_LAST_UNPACK( r, somatic__joystick, NULL, 4096, &js_chan );
     if (!(ACH_OK == r || ACH_MISSED_FRAME == r) || (js_msg == NULL)) return;
 
     // Save values from joystick message buttons and save them to be
@@ -79,7 +79,7 @@ void readJoystick() {
     memcpy(x, js_msg->axes->data, sizeof(x));
 
     // Free the joystick message
-    somatic__joystick__free_unpacked(js_msg, &protobuf_c_system_allocator);
+    somatic__joystick__free_unpacked(js_msg, NULL);
 }
 
 /******************************************************************************/

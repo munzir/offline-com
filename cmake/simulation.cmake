@@ -20,9 +20,9 @@ ENDMACRO(LIST_CONTAINS)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_INSTALL_PREFIX}/share/dart")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_INSTALL_PREFIX}/share/grip")
 
-find_package(DARTExt REQUIRED)
+#find_package(DARTExt REQUIRED)
 find_package(DART REQUIRED)
-find_package(GRIP REQUIRED)
+#find_package(GRIP REQUIRED)
 
 include_directories(${DARTExt_INCLUDEDIR})
 include_directories(${DART_INCLUDEDIR})

@@ -11,12 +11,14 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 endif()
 
 # Include Dart and Grip stuff
-include(cmake/simulation.cmake)
+#include(cmake/simulation.cmake)
+find_package(DART 6.3.0 REQUIRED COMPONENTS utils-urdf gui CONFIG)
+include_directories(${DART_INCLUDE_DIRS})
 
 # Link to somatic, amino and ach
 # NOTE: Ideally we would like to 'find' these packages but for now, we assume they are either
 # in /usr/lib or /usr/local/lib
-link_libraries(protobuf-c amino ach kore somatic filter stdc++ ncurses blas lapack)
+link_libraries(protobuf-c amino ach kore somatic filter stdc++ ncurses blas lapack pthread)
 
 
 # Include Eigen

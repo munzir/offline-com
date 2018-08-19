@@ -39,8 +39,8 @@
 #include <vector>
 #include <sstream>
 
-#include "initModules.h"
-#include "motion.h"
+#include "/home/munzir/project/krang/experiments/common/initModules.h"
+#include "/home/munzir/project/krang/experiments/common/motion.h"
 
 // // Namespaces
 using namespace std;
@@ -49,7 +49,7 @@ using namespace std;
 #define VELOCITY SOMATIC__MOTOR_PARAM__MOTOR_VELOCITY
 #define POSITION SOMATIC__MOTOR_PARAM__MOTOR_POSITION
 #define getMotorMessage(x) (SOMATIC_WAIT_LAST_UNPACK(r, somatic__motor_state, \
-    &protobuf_c_system_allocator, 1024, &x, &abstime))
+    NULL, 1024, &x, &abstime))
 
 // tolerance for the pose
 // TODO Test lower tolerance value
@@ -132,7 +132,7 @@ double getIMUState() {
     int r;
     double imu, imuSpeed;
     Somatic__Vector *imu_msg = SOMATIC_WAIT_LAST_UNPACK(r, somatic__vector,
-            &protobuf_c_system_allocator, IMU_CHANNEL_SIZE, &imuChan, &abstime);
+            NULL, IMU_CHANNEL_SIZE, &imuChan, &abstime);
     assert((imu_msg != NULL) && "Imu message is faulty!");
 
     // Get the imu position and velocity value from the readings (note imu
@@ -142,7 +142,7 @@ double getIMUState() {
     double _imu = atan2(newX, imu_msg->data[2]);
 
     // Free the unpacked message
-    somatic__vector__free_unpacked(imu_msg, &protobuf_c_system_allocator);
+    somatic__vector__free_unpacked(imu_msg, NULL);
 
     return _imu;
 }
@@ -279,7 +279,7 @@ void readJoystick() {
     // Get the message and check output is OK.
     int r = 0;
     Somatic__Joystick *js_msg =
-        SOMATIC_GET_LAST_UNPACK(r, somatic__joystick, &protobuf_c_system_allocator, 4096, &js_chan);
+        SOMATIC_GET_LAST_UNPACK(r, somatic__joystick, NULL, 4096, &js_chan);
     if (!(ACH_OK == r || ACH_MISSED_FRAME == r) || (js_msg == NULL)) return;
 
     // Save values from joystick message buttons and save them to b
@@ -290,7 +290,7 @@ void readJoystick() {
     memcpy(x, js_msg->axes->data, sizeof(x));
 
     // Free the joystick message
-    somatic__joystick__free_unpacked(js_msg, &protobuf_c_system_allocator);
+    somatic__joystick__free_unpacked(js_msg, NULL);
 }
 
 /******************************************************************************/
